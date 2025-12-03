@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="de">
+
+<head>
+    <meta charset="UTF-8" />
+    <title>MecLib / JSXGraph Aufgabe</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <!-- JSXGraph CSS -->
+    <link rel="stylesheet" href="https://jsxgraph.org/distrib/jsxgraph.css" />
+
+    <!-- JSXGraph JS -->
+    <script src="https://jsxgraph.org/distrib/jsxgraphcore.js"></script>
+
+    <!-- Deine MecLib-/ONYX-Erweiterung aus GitHub -->
+    <script src="https://cdn.jsdelivr.net/gh/Fkaule/TM_JSX_Graph@main/MecLibONYX.js"></script>
+
+    <style>
+        body {
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            margin: 1rem;
+        }
+
+        h1 {
+            font-size: 1.4rem;
+            margin-bottom: 0.5rem;
+        }
+
+        #JSX_CONTAINER_ID {
+            width: 700px;
+            height: 260px;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Interaktive MecLib-Aufgabe</h1>
+
+    <!-- Container für das Board -->
+    <div id="JSX_CONTAINER_ID" class="jxgbox"></div>
+
+    <script>
+        // =====================================================================
+        // === ONYX-CODE HIER EINFÜGEN =========================================
+        // =====================================================================
+
+        document.getElementById('JSX_CONTAINER_ID').style.border = "none";
+        JXG.Options.grid.majorStep = 0;
+
+        window.L = 5;
+        window.force_length = 2;
+        window.force_offset = 1;
+        window.force_length_value_scale = 5;
+
+
+        const brd1 = initMecLib('JSX_CONTAINER_ID');
+
+        // Die urspr&uuml;nglichen Namen F_A und F_B bleiben an den Pfeilen
+        const content = [
+            ["grid", "", "", -2, window.L + 2, -4, 4, 40],
+            ["force", "F=10 N", [window.L / 2, window.force_length], [window.L / 2, 0], -1],
+            ["force", "F_A", [0, -window.force_length / 2 - window.force_offset], [0, -window.force_offset], -1],
+            ["force", "F_B", [window.L, -window.force_length / 2 - window.force_offset], [window.L, -window.force_offset], -1],
+            ["beam", "", [0, 0], [window.L, 0], 0.1],
+            ["fix12", "A", [0, 0], 0],
+            ["fix1", "B", [window.L, 0], 0],
+        ];
+
+        const continueCode = () => {
+            const L = window.L;
+            const scale = 1;
+            const yspace = 0;
+            const forceLength = window.force_length;
+            const forceOffset = window.force_offset;
+            const forceValueScale = window.force_length_value_scale;
+
+            const yPos = -1; // Y-Position f&uuml;r die Textanzeige
+
+            board.create('text', [0.2, yPos, toTEX('F_A =')], { anchorX: 'left', fixed: true, color: 'blue' });
+            const wertAnzeigeA = board.create('text', [1.2, yPos, ''], { anchorX: 'left', fixed: true, useMathJax: false, color: 'blue' });
+
+            board.create('text', [L - 2.0, yPos, toTEX('F_B =')], { anchorX: 'left', fixed: true, color: 'blue' });
+            const wertAnzeigeB = board.create('text', [L - 1.0, yPos, ''], { anchorX: 'left', fixed: true, useMathJax: false, color: 'blue' });
+            // -----------------------------------------------------------------
+
+            const xSlider = board.create('slider',
+                [[0, 3], [L, 3], [0, L / 2, L]],
+                { fixed: false, snapWidth: 0.1, label: { visible: false } }
+            );
+
+            const forceObjects = [objects[1], objects[2], objects[3]];
+
+            forceObjects.forEach(obj => {
+                obj.p1.setAttribute({ fixed: false });
+                obj.p2.setAttribute({ fixed: false });
+            });
+
+            const setForceX = (x) => {
+                const [forceObj, rforceAObj, rforceBObj] = forceObjects;
+
+                forceObj.p1.moveTo([x, forceObj.p1.Y()], 0);
+                forceObj.p2.moveTo([x, forceObj.p2.Y()], 0);
+
+                const rforceA_value = forceLength * (L - x) / L;
+                const rforceB_value = forceLength * x / L;
+
+                rforceAObj.p1.moveTo([0, -rforceA_value - forceOffset], 0);
+                rforceBObj.p1.moveTo([L, -rforceB_value - forceOffset], 0);
+
+                wertAnzeigeA.setText((forceValueScale * rforceA_value).toFixed(1) + ' N');
+                wertAnzeigeB.setText((forceValueScale * rforceB_value).toFixed(1) + ' N');
+
+                board.update();
+            };
+
+            xSlider.on('drag', () => setForceX(xSlider.Value()));
+            setForceX(xSlider.Value());
+        };
+
+        runMecLib(brd1, content, continueCode);
+
+        // =====================================================================
+        // === ENDE ONYX-CODE ================================================
+        // =====================================================================
+    </script>
+</body>
+
+</html>

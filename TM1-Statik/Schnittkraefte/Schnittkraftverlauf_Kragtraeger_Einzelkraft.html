@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="de">
+
+<head>
+    <meta charset="UTF-8" />
+    <title>MecLib / JSXGraph Aufgabe</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <!-- JSXGraph CSS -->
+    <link rel="stylesheet" href="https://jsxgraph.org/distrib/jsxgraph.css" />
+
+    <!-- JSXGraph JS -->
+    <script src="https://jsxgraph.org/distrib/jsxgraphcore.js"></script>
+
+    <!-- Deine MecLib-/ONYX-Erweiterung aus GitHub -->
+    <script src="https://cdn.jsdelivr.net/gh/Fkaule/TM_JSX_Graph@main/MecLibONYX.js"></script>
+
+    <style>
+        body {
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            margin: 1rem;
+        }
+
+        h1 {
+            font-size: 1.4rem;
+            margin-bottom: 0.5rem;
+        }
+
+        #JSX_CONTAINER_ID {
+            width: 700px;
+            height: 260px;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Interaktive MecLib-Aufgabe</h1>
+
+    <!-- Container für das Board -->
+    <div id="JSX_CONTAINER_ID" class="jxgbox"></div>
+
+    <script>
+        // =====================================================================
+        // === ONYX-CODE HIER EINFÜGEN =========================================
+        // =====================================================================
+
+        // === Sicht & Grundsetup (ONYX / meclib) ===
+        document.getElementById('JSX_CONTAINER_ID').style.border = "none";
+        JXG.Options.grid.majorStep = 0;
+
+        // Globale Parameter
+        window.L = 10;                  // Balkenl&auml;nge
+        window.force_length = 1.5;      // grafische Pfeill&auml;nge
+        window.yMin = -12;              // unterer Rand
+        window.yMax = 5;                // oberer Rand
+
+        // >>> Winkel-Parameter (nur Darstellung, beeinflusst NICHT die Last)
+        window.ANGLE_CFG = {
+            base: 'up',          // 'up' | 'down' | 'left' | 'right' | Number (Grad)
+            cwPositive: false,     // +&phi; gegen den Uhrzeigersinn
+            radius: null,          // null => 0.50*len0
+            gap: -0.8,          // Abstand Startpunkt vom Balken (hier absolute y-Einheit)
+            color: '#444',
+            layer: 9,
+            n: 20,
+            headLengthFrac: 0.16,
+            headWidthFrac: 0.18,
+            label: '&phi;',
+            labelDx: 0.10,
+            labelDy: 0.06
+        };
+
+        // >>> Momentenpfeil-Parameter (nur Darstellung, abh&auml;ngig von |M_A|)
+        window.MOM_CFG = {
+            cx: 0.0,              // Mittelpunkt x des Momentenbogens (z. B. nahe Lager A)
+            cy: 0.0,              // Mittelpunkt y (unter dem Balken)
+            radius: 1,            // Radius des Momentenbogens
+            color: '#0000ff',     // Farbe
+            layer: 9,             // Zeichenebene
+            maxAngleDeg: 120,     // maximaler Bogenwinkel (Grad) bei gro&szlig;em |M_A|
+            arrowLen: 0.28,       // L&auml;nge des Pfeil-Segments (Kopf sitzt an Kurvenende)
+            Mref: null            // Skalierung: null => P0*L (siehe unten)
+        };
+
+        var brd = initMecLib('JSX_CONTAINER_ID');
+
+        // === content ===
+        var content = [
+            ["grid", "", "", -3, window.L + 2, window.yMin, window.yMax, 40],
+            ["beam", "", [0, 0], [window.L, 0], 0.12],
+            ["fix123", "A", [0, 0], 0], // Einspannung links (optisch)
+            ["force", "F", [window.L / 2, -window.force_length], [window.L / 2, 0], -1], // Einzellast
+            ["force", "R_A", [0, 0.6], [0, 0], -1]                                    // Reaktion (optisch)
+        ];
+
+        function continueCode() {
+            var L = window.L;
+            var P0 = 1000;                     // Lastbetrag (Skalierung f&uuml;r Pfeile/Diagramme)
+
+            // Diagramm-Skalierung und Baselines
+            var kN = 1 / 750, kQ = -1 / 750, kM = 1 / 4000;
+            var yN = -3.0, yQ = -5.0, yM = -7.0;
+            var xSy = 2.3, phiSy = 3.1;      // Slider-Y
+
+            // Objekte
+            var Fext = objects[3];
+            var RA = objects[4];
+
+            Fext.p2.setAttribute({ fixed: true }); Fext.p1.setAttribute({ fixed: false });
+            RA.p2.setAttribute({ fixed: true }); RA.p1.setAttribute({ fixed: false });
+
+            var forceLayer = 9, diagLayer = 6;
+            [Fext, RA].forEach(function (f) {
+                try {
+                    f.setAttribute({ layer: forceLayer });
+                    if (f.p1) f.p1.setAttribute({ layer: forceLayer });
+                    if (f.p2) f.p2.setAttribute({ layer: forceLayer });
+                } catch (e) { }
+            });
+
+            // Slider
+            var xSlider = board.create('slider', [[0, xSy], [L, xSy], [0, L / 2, L]], { fixed: false, snapWidth: 1, label: { visible: false } });
+            var phiSlider = board.create('slider', [[0, phiSy], [L, phiSy], [-180, 0, 180]], { fixed: false, snapWidth: 15, label: { visible: false } });
+            [xSlider, phiSlider].forEach(function (s) {
+                try {
+                    if (s.point1) s.point1.setAttribute({ fixed: true });
+                    if (s.point2) s.point2.setAttribute({ fixed: true });
+                    if (s.point3) s.point3.setAttribute({ fixed: false });
+                } catch (e) { }
+            });
+
+            board.create('text', [L + 0.2, phiSy, function () { return '&phi; = ' + phiSlider.Value().toFixed(0) + '°'; }], { fixed: true, layer: forceLayer });
+            board.create('text', [L + 0.2, xSy, function () { return 'x = ' + (xSlider.Value() / L).toFixed(1) + 'L'; }], { fixed: true, layer: forceLayer });
+
+
+            // --- L&auml;ngenbema&szlig;ung x (von A bis zur Kraft) unter dem Balken ---
+            var dimLayer = 8;
+            var yDim = -1.2;   // H&ouml;he der Ma&szlig;linie (unterhalb des Balkens bei y=0)
+            var extTop = -0.2;   // Start der senkrechten Ansetzlinien (knapp unter dem Balken)
+
+            // Hilfspunkte (unsichtbar), damit alles dynamisch mit dem Slider l&auml;uft
+            var pA_dim = board.create('point', [0, yDim], { visible: false, fixed: true, layer: dimLayer });
+            var pX_dim = board.create('point',
+                [function () { return xSlider.Value(); }, function () { return yDim; }],
+                { visible: false, layer: dimLayer }
+            );
+
+            // Ansetzlinien (senkrecht vom Balken zur Ma&szlig;linie)
+            var pA_top = board.create('point', [0, extTop], { visible: false, fixed: true, layer: dimLayer });
+            var pX_top = board.create('point',
+                [function () { return xSlider.Value(); }, function () { return extTop; }],
+                { visible: false, layer: dimLayer }
+            );
+            board.create('segment', [pA_top, pA_dim], { strokeColor: '#444', strokeWidth: 1, layer: dimLayer });
+            board.create('segment', [pX_top, pX_dim], { strokeColor: '#444', strokeWidth: 1, layer: dimLayer });
+
+            // Doppelpfeil (&hArr;) als Ma&szlig;linie: zwei Pfeile, damit an beiden Enden ein Kopf ist
+            board.create('arrow', [pA_dim, pX_dim], { strokeColor: '#444', strokeWidth: 2, layer: dimLayer });
+            board.create('arrow', [pX_dim, pA_dim], { strokeColor: '#444', strokeWidth: 2, layer: dimLayer });
+
+            // Ma&szlig;-Label in der Mitte der Ma&szlig;linie
+            var dimText = board.create('text', [
+                function () { return 0.5 * xSlider.Value(); },
+                function () { return yDim - 0.30; }, // leicht unterhalb der Linie
+                function () {
+                    var L = window.L || 10;
+                    return 'x/L = ' + (xSlider.Value() / L).toFixed(1);
+                    // Alternative: 'x = ' + (xSlider.Value()/L).toFixed(1) + '&middot;L'
+                }
+            ], { fixed: true, layer: dimLayer, color: '#444' });
+
+
+
+            // Pfeill&auml;nge aus Start-Geometrie
+            var len0 = (function () {
+                var dx = Fext.p1.X() - Fext.p2.X();
+                var dy = Fext.p1.Y() - Fext.p2.Y();
+                var d = Math.sqrt(dx * dx + dy * dy);
+                return d > 1e-9 ? d : window.force_length;
+            })();
+
+            // ================= Winkel-Grafik (nur Darstellung, entkoppelt von Last) =================
+            function makeAngleGlyph(cfgIn) {
+                var cfg = Object.assign({}, window.ANGLE_CFG, cfgIn || {});
+                if (cfg.radius == null) cfg.radius = 0.50 * len0;
+                if (cfg.gap == null) cfg.gap = 0.08 * len0;
+
+                function baseToRad(b) {
+                    if (typeof b === 'number') return b * Math.PI / 180;
+                    if (b === 'up') return 0;
+                    if (b === 'right') return Math.PI / 2;
+                    if (b === 'down') return Math.PI;
+                    if (b === 'left') return -Math.PI / 2;
+                    return 0;
+                }
+                var t0 = baseToRad(cfg.base);
+
+                function yStartFromBase() {
+                    if (cfg.base === 'down') return +cfg.gap; // &uuml;ber Balken
+                    return -cfg.gap;                           // unter Balken (Default)
+                }
+                var yStart = yStartFromBase();
+                var yc = yStart - cfg.radius * Math.cos(t0);
+
+                var arcCurve = board.create('curve', [[], []], { strokeColor: cfg.color, strokeWidth: 2, layer: cfg.layer });
+                var pL = board.create('point', [0, 0], { visible: false, fixed: true });
+                var pR = board.create('point', [0, 0], { visible: false, fixed: true });
+                var pT = board.create('point', [0, 0], { visible: false, fixed: true });
+                var head = board.create('polygon', [pL, pR, pT], {
+                    fillColor: cfg.color, fillOpacity: 1.0, borders: { visible: false }, layer: cfg.layer
+                });
+
+                var _lx = 0, _ly = 0;
+                var label = board.create('text', [
+                    function () { return _lx; },
+                    function () { return _ly; },
+                    function () { return cfg.label; }
+                ], { fixed: true, color: cfg.color, layer: cfg.layer });
+
+                function update(x, deg) {
+                    var sign = cfg.cwPositive ? +1 : -1;
+                    var phi = (deg * Math.PI / 180) * sign;
+                    var n = Math.max(4, Math.floor(cfg.n || 20));
+                    var X = [], Y = [];
+                    for (var i = 0; i <= n; i++) {
+                        var t = t0 + phi * (i / n);
+                        X.push(x + cfg.radius * Math.sin(t));
+                        Y.push(yc + cfg.radius * Math.cos(t));
+                    }
+                    arcCurve.dataX = X; arcCurve.dataY = Y;
+
+                    var xe = X[n], ye = Y[n];
+                    var xp = X[Math.max(0, n - 1)], yp = Y[Math.max(0, n - 1)];
+                    var vx = xe - xp, vy = ye - yp, vlen = Math.hypot(vx, vy) || 1; vx /= vlen; vy /= vlen;
+                    var hx = cfg.headLengthFrac * cfg.radius, hw = cfg.headWidthFrac * cfg.radius;
+                    var bx = xe - vx * hx, by = ye - vy * hx;
+                    var nx = -vy, ny = vx;
+                    pT.moveTo([xe, ye], 0);
+                    pL.moveTo([bx + nx * (hw / 2), by + ny * (hw / 2)], 0);
+                    pR.moveTo([bx - nx * (hw / 2), by - ny * (hw / 2)], 0);
+
+                    var tm = t0 + phi / 2;
+                    _lx = x + cfg.radius * Math.sin(tm) + cfg.labelDx;
+                    _ly = yc + cfg.radius * Math.cos(tm) + cfg.labelDy;
+
+                    var vis = Math.abs(phi) > 1e-3;
+                    arcCurve.setAttribute({ visible: vis });
+                    head.setAttribute({ visible: vis });
+                    label.setAttribute({ visible: vis });
+                }
+
+                function set(newCfg) { Object.assign(cfg, newCfg || {}); }
+                return { update, set, cfg };
+            }
+            var angleGlyph = makeAngleGlyph(window.ANGLE_CFG);
+
+            // ================= Last & Reaktionen (immer gleiche Definition!) =================
+            // Wir rechnen intern mit &phi;_eff = &phi; + 180°, Slider/Anzeige bleiben unver&auml;ndert.
+            function phiEff(deg) { return deg + 180; }
+            function radDownFromPhiEff(deg) {
+                return (phiEff(deg) - 180) * Math.PI / 180;  // effektiv: deg * &pi;/180
+            }
+
+            // meclib-Force erwartet 0° "nach unten" &rarr; radDown = (&phi;_eff - 180°)
+            function setForce(x, deg) {
+                var radDown = radDownFromPhiEff(deg);  // &phi;_eff verwenden
+                Fext.p2.moveTo([x, 0], 0);
+                var tailx = x - len0 * Math.sin(radDown);
+                var taily = 0 + len0 * Math.cos(radDown);
+                Fext.p1.moveTo([tailx, taily], 0);
+            }
+
+            function reactions(x, deg) {
+                var radDown = radDownFromPhiEff(deg);  // &phi;_eff verwenden
+                var Fx = P0 * Math.sin(radDown);
+                var Fy = -P0 * Math.cos(radDown);
+                var Ax = -Fx;
+                var Ay = -Fy;
+                var MA = Fy * x;
+                return { Fx: Fx, Fy: Fy, Ax: Ax, Ay: Ay, MA: MA };
+            }
+
+            // ===== Diagramme N, Q, M =====
+            var nCurve = board.create('curve', [[], []], { strokeColor: '#2d6cdf', strokeWidth: 2, layer: diagLayer });
+            var nFill = board.create('polygon', [
+                board.create('point', [0, yN], { visible: false }),
+                board.create('point', [0, yN], { visible: false }),
+                board.create('point', [0, yN], { visible: false }),
+                board.create('point', [0, yN], { visible: false })
+            ], { fillColor: '#2d6cdf', fillOpacity: 0.18, borders: { visible: false }, layer: diagLayer });
+
+            var qCurve = board.create('curve', [[], []], { strokeColor: '#00897b', strokeWidth: 2, layer: diagLayer });
+            var qFill1 = board.create('polygon', [
+                board.create('point', [0, yQ], { visible: false }),
+                board.create('point', [0, yQ], { visible: false }),
+                board.create('point', [0, yQ], { visible: false }),
+                board.create('point', [0, yQ], { visible: false })
+            ], { fillColor: '#00897b', fillOpacity: 0.18, borders: { visible: false }, layer: diagLayer });
+            var qFill2 = board.create('polygon', [
+                board.create('point', [0, yQ], { visible: false }),
+                board.create('point', [0, yQ], { visible: false }),
+                board.create('point', [0, yQ], { visible: false }),
+                board.create('point', [0, yQ], { visible: false })
+            ], { fillColor: '#00897b', fillOpacity: 0.18, borders: { visible: false }, layer: diagLayer });
+
+            var mCurve = board.create('curve', [[], []], { strokeColor: '#e53935', strokeWidth: 2, layer: diagLayer });
+            var mFillL = board.create('polygon', [
+                board.create('point', [0, yM], { visible: false }),
+                board.create('point', [0, yM], { visible: false }),
+                board.create('point', [0, yM], { visible: false })
+            ], { fillColor: '#e53935', fillOpacity: 0.18, borders: { visible: false }, layer: diagLayer });
+            var mFillR = board.create('polygon', [
+                board.create('point', [0, yM], { visible: false }),
+                board.create('point', [0, yM], { visible: false }),
+                board.create('point', [0, yM], { visible: false })
+            ], { fillColor: '#e53935', fillOpacity: 0.18, borders: { visible: false }, layer: diagLayer });
+
+            board.create('text', [-0.6, yN, 'N'], { fixed: true, layer: diagLayer });
+            board.create('text', [-0.6, yQ, 'Q'], { fixed: true, layer: diagLayer });
+            board.create('text', [-0.6, yM, 'M'], { fixed: true, layer: diagLayer });
+
+            // ===================== Momentenpfeil (an Lager A, abh&auml;ngig von |M_A|) =====================
+            // Zus&auml;tzliche (optionale) Optik-Parameter:
+            var MCFG = Object.assign({
+                cx: 0.0,
+                cy: 0.0,
+                radius: 1.0,
+                color: '#0000ff',
+                layer: 9,
+                maxAngleDeg: 120,
+                Mref: P0 * L,
+                // Kopf-/Schaft-Geometrie
+                headLen: 0.12,    // L&auml;nge der Pfeilspitze (entlang Tangente)
+                headWidth: 0.26,  // Breite der Pfeilspitze
+                shaftLen: 0.14    // sichtbare Schaftl&auml;nge bis zur Spitze
+            }, window.MOM_CFG || {});
+
+            function MA_current() {
+                var x = xSlider.Value();
+                var phi = phiSlider.Value();
+                var radDown = radDownFromPhiEff(phi); // &phi;_eff verwenden
+                var Fy = -P0 * Math.cos(radDown);
+                return Fy * x; // Einspannmoment A
+            }
+            function alphaCurrent() { // Bogenwinkel (rad), skaliert bis maxAngleDeg
+                var m = Math.abs(MA_current());
+                var a = (m / (MCFG.Mref || (P0 * L)));
+                var max = (MCFG.maxAngleDeg || 120) * Math.PI / 180;
+                return Math.min(max, a * max);
+            }
+            function signCurrent() { return (MA_current() >= 0) ? -1 : +1; } // ggf. tauschen, falls Drehsinn anders gew&uuml;nscht
+
+            var rMom = (MCFG.radius || 0.6);
+            var startAngle = Math.PI; // Referenzwinkel
+
+            // Bogen (wie gehabt)
+            var mArc = board.create('curve', [
+                function (t) { return MCFG.cx + rMom * Math.cos(t); },
+                function (t) { return MCFG.cy + rMom * Math.sin(t); },
+                function () { return startAngle; },
+                function () { return startAngle + signCurrent() * alphaCurrent(); }
+            ], { strokeWidth: 2, strokeColor: MCFG.color, layer: MCFG.layer });
+
+            // Hilfsfunktionen am Bogenende
+            function tEnd() { return startAngle + signCurrent() * alphaCurrent(); }
+            function tipX() { var t = tEnd(); return MCFG.cx + rMom * Math.cos(t); }
+            function tipY() { var t = tEnd(); return MCFG.cy + rMom * Math.sin(t); }
+            // Tangente am Kreis: d/dt (cos, sin) = (-sin, cos); Richtung entlang Bogen = *signCurrent()
+            function ux() { var t = tEnd(); return -Math.sin(t) * signCurrent(); }
+            function uy() { var t = tEnd(); return Math.cos(t) * signCurrent(); }
+            // Normale (links von u): n = (-uy, ux)
+            function nx() { return -uy(); }
+            function ny() { return ux(); }
+
+            // Schaft-Basispunkt (kurz vor der Spitze entlang -u)
+            var mBase = board.create('point', [
+                function () { return tipX() - (MCFG.shaftLen || 0.14) * ux(); },
+                function () { return tipY() - (MCFG.shaftLen || 0.14) * uy(); }
+            ], { visible: false });
+
+            // Sichtbarer kurzer Schaft
+            var mShaft = board.create('segment', [
+                mBase,
+                function () { return [tipX(), tipY()]; }
+            ], { strokeColor: MCFG.color, strokeWidth: 2, layer: MCFG.layer });
+
+            // Kopf-Dreieck: Spitze = tip, Basis = tip - headLen*u &plusmn; (headWidth/2)*n
+            var mHeadL = board.create('point', [
+                function () {
+                    var hl = (MCFG.headLen || 0.32), hw = (MCFG.headWidth || 0.26);
+                    var bx = tipX() - hl * ux(), by = tipY() - hl * uy();
+                    return bx + (hw / 2) * nx();
+                },
+                function () {
+                    var hl = (MCFG.headLen || 0.32), hw = (MCFG.headWidth || 0.26);
+                    var bx = tipX() - hl * ux(), by = tipY() - hl * uy();
+                    return by + (hw / 2) * ny();
+                }
+            ], { visible: false });
+
+            var mHeadR = board.create('point', [
+                function () {
+                    var hl = (MCFG.headLen || 0.32), hw = (MCFG.headWidth || 0.26);
+                    var bx = tipX() - hl * ux(), by = tipY() - hl * uy();
+                    return bx - (hw / 2) * nx();
+                },
+                function () {
+                    var hl = (MCFG.headLen || 0.32), hw = (MCFG.headWidth || 0.26);
+                    var bx = tipX() - hl * ux(), by = tipY() - hl * uy();
+                    return by - (hw / 2) * ny();
+                }
+            ], { visible: false });
+
+            var mTip = board.create('point', [function () { return tipX(); }, function () { return tipY(); }], { visible: false });
+
+            var mHead = board.create('polygon', [mHeadL, mHeadR, mTip], {
+                fillColor: MCFG.color, fillOpacity: 1.0, borders: { visible: false }, layer: MCFG.layer
+            });
+
+            // --- Zusatz-Optionen f&uuml;r das Label (relativ zum Radius) ---
+            MCFG = Object.assign({
+                label: 'M<sub>A</sub>',
+                labelDx: 0.4,   // wie weit links neben dem Bogenstart (Vielfaches von r)
+                labelDy: 0.00   // kleiner vertikaler Versatz (Vielfaches von r)
+            }, MCFG);
+
+            // Startpunkt des Bogens (Pfeil-BEGinn) bei startAngle = &pi;
+            function startX() { return MCFG.cx + rMom * Math.cos(startAngle); } // = cx - r
+            function startY() { return MCFG.cy + rMom * Math.sin(startAngle); } // = cy
+
+            // Label neben dem Bogenstart (etwas weiter nach links versetzt)
+            var maLabel = board.create('text', [
+                function () { return startX() - (MCFG.labelDx || 0.22) * rMom; },
+                function () { return startY() + (MCFG.labelDy || 0.0) * rMom; },
+                function () { return MCFG.label || 'M<sub>A</sub>'; }
+            ], { fixed: true, layer: MCFG.layer, color: MCFG.color });
+
+            function updateMomentVisibility() {
+                var vis = Math.abs(MA_current()) > 1e-9;
+                mArc.setAttribute({ visible: vis });
+                mShaft.setAttribute({ visible: vis });
+                mHead.setAttribute({ visible: vis });
+                maLabel.setAttribute({ visible: vis });
+            }
+
+            // ----- Update -----
+            function updateAll() {
+                var x = xSlider.Value();
+                var phi = phiSlider.Value();   // 0° oben, +CW (Anzeige unver&auml;ndert)
+
+                setForce(x, phi);        // Last (mit &phi;_eff) zeichnen
+                angleGlyph.update(x, phiForGlyph(phi));
+
+                var R = reactions(x, phi);    // Reaktionen (mit &phi;_eff) berechnen
+                var N2len = len0 / P0;
+
+                // Reaktionspfeil (optisch): nach oben = p1 unter Basis
+                RA.p1.moveTo([RA.p2.X() - N2len * R.Ax, RA.p2.Y() - N2len * R.Ay], 0);
+
+                // N: (0..x) = Ax, danach 0
+                var yNx = yN + kN * R.Ax;
+                nCurve.dataX = [0, 0, x, x, L];
+                nCurve.dataY = [yN, yNx, yNx, yN, yN];
+                nFill.vertices[0].moveTo([0, yN], 0);
+                nFill.vertices[1].moveTo([0, yNx], 0);
+                nFill.vertices[2].moveTo([x, yNx], 0);
+                nFill.vertices[3].moveTo([x, yN], 0);
+
+                // Q: (0..x) = Ay, danach 0
+                var yQ1 = yQ + kQ * R.Ay;
+                qCurve.dataX = [0, 0, x, x, L, L];
+                qCurve.dataY = [yQ, yQ1, yQ1, yQ, yQ, yQ];
+                qFill1.vertices[0].moveTo([0, yQ], 0);
+                qFill1.vertices[1].moveTo([0, yQ1], 0);
+                qFill1.vertices[2].moveTo([x, yQ1], 0);
+                qFill1.vertices[3].moveTo([x, yQ], 0);
+                qFill2.vertices[0].moveTo([x, yQ], 0);
+                qFill2.vertices[1].moveTo([L, yQ], 0);
+                qFill2.vertices[2].moveTo([L, yQ], 0);
+                qFill2.vertices[3].moveTo([x, yQ], 0);
+
+                // M: links Dreieck, danach 0
+                var yMx0 = yM + kM * R.MA;  // bei s=0
+                mCurve.dataX = [0, x, L];
+                mCurve.dataY = [yMx0, yM, yM];
+
+                mFillL.vertices[0].moveTo([0, yM], 0);
+                mFillL.vertices[1].moveTo([x, yM], 0);
+                mFillL.vertices[2].moveTo([0, yMx0], 0);
+
+                mFillR.vertices[0].moveTo([x, yM], 0);
+                mFillR.vertices[1].moveTo([L, yM], 0);
+                mFillR.vertices[2].moveTo([x, yM], 0);
+
+                updateMomentVisibility();
+                board.update();
+            }
+
+            var onDrag = function () { try { updateAll(); } catch (e) { console.error(e); } };
+            xSlider.on('drag', onDrag); xSlider.on('up', onDrag);
+            phiSlider.on('drag', onDrag); phiSlider.on('up', onDrag);
+            try {
+                if (xSlider.point3) { xSlider.point3.on('drag', onDrag); xSlider.point3.on('up', onDrag); }
+                if (phiSlider.point3) { phiSlider.point3.on('drag', onDrag); phiSlider.point3.on('up', onDrag); }
+            } catch (e) { }
+
+            function phiForGlyph(deg) { return deg; }  // nur f&uuml;r die Bema&szlig;ung
+
+
+            updateAll();
+        }
+
+        runMecLib(brd, content, continueCode);
+
+        // =====================================================================
+        // === ENDE ONYX-CODE ================================================
+        // =====================================================================
+    </script>
+</body>
+
+</html>

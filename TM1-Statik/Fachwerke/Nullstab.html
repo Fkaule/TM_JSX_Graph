@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="de">
+
+<head>
+    <meta charset="UTF-8" />
+    <title>MecLib / JSXGraph Aufgabe</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <!-- JSXGraph CSS -->
+    <link rel="stylesheet" href="https://jsxgraph.org/distrib/jsxgraph.css" />
+
+    <!-- JSXGraph JS -->
+    <script src="https://jsxgraph.org/distrib/jsxgraphcore.js"></script>
+
+    <!-- Deine MecLib-/ONYX-Erweiterung aus GitHub -->
+    <script src="https://cdn.jsdelivr.net/gh/Fkaule/TM_JSX_Graph@main/MecLibONYX.js"></script>
+
+    <style>
+        body {
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            margin: 1rem;
+        }
+
+        h1 {
+            font-size: 1.4rem;
+            margin-bottom: 0.5rem;
+        }
+
+        #JSX_CONTAINER_ID {
+            width: 700px;
+            height: 260px;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Interaktive MecLib-Aufgabe</h1>
+
+    <!-- Container für das Board -->
+    <div id="JSX_CONTAINER_ID" class="jxgbox"></div>
+
+    <script>
+        // =====================================================================
+        // === ONYX-CODE HIER EINFÜGEN =========================================
+        // =====================================================================
+
+        document.getElementById('JSX_CONTAINER_ID').style.border = "none";
+        JXG.Options.grid.majorStep = 0;
+
+        window.L = 5;
+        window.force_length = 2;
+        window.force_offset = 1;
+        window.force_length_value_scale = 5;
+
+        var brd1 = initMecLib('JSX_CONTAINER_ID');
+
+        // Inhalte
+        var content = [
+            ["grid", "", "", -3, window.L + 2, -4, 7, 40],
+
+            // &auml;u&szlig;ere Kraft
+            ["force", "F=10 N", [window.L / 2, window.L / 2 + window.force_length], [window.L / 2, window.L / 2], -1],
+
+            // St&auml;be
+            ["bar", "", [0, 0], [window.L, 0], 0.1], // AB
+            ["bar", "", [0, 0], [window.L / 2, window.L / 2], 0.1], // AC
+            ["bar", "", [window.L / 2, window.L / 2], [window.L, 0], 0.1], // CB
+
+            // Auflager
+            ["fix12", "A", [0, 0], 0],
+            ["fix1", "B", [window.L, 0], 0],
+
+            // Reaktionskr&auml;fte als meclib-"force"
+            ["force", "R_A", [0, 1], [0, 0], -1],              // objects[7]
+            ["force", "R_B", [window.L, 1], [window.L, 0], -1],          // objects[8]
+
+            ["node", "C", [window.L / 2, window.L / 2]],
+        ];
+
+        function continueCode() {
+            // Parameter / Geometrie
+            var L = window.L;
+            var cx = L / 2, cy = L / 2;
+            var P0 = 10;
+            var zeroTol = 1e-3;
+
+            // Slider (nur Richtung)
+            var phiSlider = board.create('slider',
+                [[0, 6], [L, 6], [-45, 0, 45]],
+                { fixed: false, snapWidth: 1, label: { visible: false } }
+            );
+            try {
+                if (phiSlider.point1) phiSlider.point1.setAttribute({ fixed: true });
+                if (phiSlider.point2) phiSlider.point2.setAttribute({ fixed: true });
+                if (phiSlider.point3) phiSlider.point3.setAttribute({ fixed: false });
+            } catch (e) { }
+
+            // Objekte aus content
+            var Fext = objects[1];
+            var barAB = objects[2], barAC = objects[3], barCB = objects[4];
+            var R_A = objects[7];
+            var R_B = objects[8];
+
+            // Angriffspunkte fix, Spitzen beweglich
+            Fext.p2.setAttribute({ fixed: true }); Fext.p1.setAttribute({ fixed: false });
+            R_A.p2.setAttribute({ fixed: true }); R_A.p1.setAttribute({ fixed: false });
+            R_B.p2.setAttribute({ fixed: true }); R_B.p1.setAttribute({ fixed: false });
+
+            // L&auml;ngenskalierung (10 N &rarr; len0)
+            var len0 = (function () {
+                var dx = Fext.p1.X() - Fext.p2.X();
+                var dy = Fext.p1.Y() - Fext.p2.Y();
+                var d = Math.sqrt(dx * dx + dy * dy);
+                return d > 1e-9 ? d : window.force_length;
+            })();
+            var N2len = len0 / P0;
+
+            // &auml;u&szlig;ere Kraft rotieren (0°: p1 oberhalb p2)
+            function setForceAngle(deg) {
+                var rad = deg * Math.PI / 180;
+                var px = Fext.p2.X(), py = Fext.p2.Y();
+                var x = px + len0 * Math.sin(rad);
+                var y = py + len0 * Math.cos(rad);
+                Fext.p1.moveTo([x, y], 0);
+            }
+
+            // *** Farb-Overlays (auf niedrigem Layer) ***
+            var overlayLayer = 9, forceLayer = 10;
+
+            // Unsichtbare Punkte A,B,C
+            var A = board.create('point', [0, 0], { visible: false, fixed: true });
+            var B = board.create('point', [L, 0], { visible: false, fixed: true });
+            var C = board.create('point', [cx, cy], { visible: false, fixed: true });
+
+            // Farb-Linien (&uuml;ber St&auml;ben), aber auf niedrigem Layer
+            var colAC = board.create('segment', [A, C], { strokeWidth: 4, strokeColor: '#888', layer: overlayLayer, strokeOpacity: 1.0 });
+            var colCB = board.create('segment', [C, B], { strokeWidth: 4, strokeColor: '#888', layer: overlayLayer, strokeOpacity: 1.0 });
+            var colAB = board.create('segment', [A, B], { strokeWidth: 4, strokeColor: '#888', layer: overlayLayer, strokeOpacity: 1.0 });
+
+            colAC.setAttribute({ layer: overlayLayer });
+            colCB.setAttribute({ layer: overlayLayer });
+            colAB.setAttribute({ layer: overlayLayer });
+
+
+            // *** Kr&auml;fte auf hohen Layer legen (&uuml;ber allem sichtbar) ***
+            try {
+                // &auml;u&szlig;ere Kraft
+                Fext.setAttribute({ layer: forceLayer });
+                if (Fext.p1) Fext.p1.setAttribute({ layer: forceLayer });
+                if (Fext.p2) Fext.p2.setAttribute({ layer: forceLayer });
+
+                // Reaktionen
+                R_A.setAttribute({ layer: forceLayer });
+                if (R_A.p1) R_A.p1.setAttribute({ layer: forceLayer });
+                if (R_A.p2) R_A.p2.setAttribute({ layer: forceLayer });
+
+                R_B.setAttribute({ layer: forceLayer });
+                if (R_B.p1) R_B.p1.setAttribute({ layer: forceLayer });
+                if (R_B.p2) R_B.p2.setAttribute({ layer: forceLayer });
+            } catch (e) { }
+
+            function segColor(F) {
+                if (!isFinite(F) || Math.abs(F) < zeroTol) return '#888888';
+                return (F >= 0) ? '#cc3333' : '#3366cc';
+            }
+
+            // Analytik: Px = P0*sin &phi;, Py = P0*cos &phi;
+            function computeMemberForces(deg) {
+                var rad = deg * Math.PI / 180;
+                var Px = P0 * Math.sin(rad);
+                var Py = P0 * Math.cos(rad);
+                var invrt2 = 1 / Math.sqrt(2);
+                return {
+                    Px: Px, Py: Py,
+                    N_AC: (Px + Py) * invrt2,
+                    N_BC: (Py - Px) * invrt2,
+                    N_AB: (Px - Py) / 2
+                };
+            }
+            // Lagerkr&auml;fte: Ax = -Px; By = (Px - Py)/2; Ay = -(Px + Py)/2
+            function computeReactions(Px, Py) {
+                var Ax = +Px;
+                var By = -(Px - Py) / 2;
+                var Ay = +(Px + Py) / 2;
+
+                return { Ax: Ax, Ay: Ay, By: By };
+            }
+
+            // Live-Winkelanzeige
+            board.create('text', [window.L / 2 - 0.5, window.L / 2 - 0.7, function () {
+                return '&phi; = ' + phiSlider.Value().toFixed(0) + '°';
+            }], { fixed: true, layer: forceLayer });
+
+            // Stabkraft-Texte
+            var N_AB = NaN, N_AC = NaN, N_BC = NaN;
+            board.create('text', [
+                function () { return (0 + cx) / 2 + 0.25; },
+                function () { return (0 + cy) / 2 + 0.05; },
+                function () { return isFinite(N_AC) ? (N_AC.toFixed(2) + ' N') : '&mdash;'; }
+            ], { fixed: true, layer: forceLayer });
+            board.create('text', [
+                function () { return (cx + L) / 2 + 0.15; },
+                function () { return (cy + 0) / 2 + 0.15; },
+                function () { return isFinite(N_BC) ? (N_BC.toFixed(2) + ' N') : '&mdash;'; }
+            ], { fixed: true, layer: forceLayer });
+            board.create('text', [
+                function () { return (0 + L) / 2 - 0.2; },
+                function () { return 0.3; },
+                function () { return isFinite(N_AB) ? (N_AB.toFixed(2) + ' N') : '&mdash;'; }
+            ], { fixed: true, layer: forceLayer });
+
+            // Lagerkraft-Texte
+            var Ax = NaN, Ay = NaN, By = NaN;
+            board.create('text', [
+                function () { return -0.5; },
+                function () { return 0; },
+                function () {
+                    if (!isFinite(Ax) || !isFinite(Ay)) return 'Ax=?, Ay=?';
+                    return 'Ax=' + Ax.toFixed(2) + ' N, Ay=' + Ay.toFixed(2) + ' N';
+                }
+            ], { fixed: true, anchorX: 'right', layer: forceLayer });
+            board.create('text', [
+                function () { return L + 0.2; },
+                function () { return -1.2; },
+                function () {
+                    if (!isFinite(By)) return 'By=?';
+                    return 'By=' + By.toFixed(2) + ' N';
+                }
+            ], { fixed: true, anchorX: 'left', layer: forceLayer });
+
+            // Update
+            function updateAll() {
+                var phi = phiSlider.Value();
+                setForceAngle(phi);
+
+                var mf = computeMemberForces(phi);
+                N_AC = mf.N_AC; N_BC = mf.N_BC; N_AB = mf.N_AB;
+
+                var rc = computeReactions(mf.Px, mf.Py);
+                Ax = rc.Ax; Ay = rc.Ay; By = rc.By;
+
+                // Stabfarben (Overlays auf niedrigem Layer)
+                colAC.setAttribute({ strokeColor: segColor(N_AC) });
+                colCB.setAttribute({ strokeColor: segColor(N_BC) });
+                colAB.setAttribute({ strokeColor: segColor(N_AB) });
+
+                // Reaktionspfeile (auf hohem Layer sichtbar)
+                R_A.p1.moveTo([R_A.p2.X() - N2len * Ax, R_A.p2.Y() - N2len * Ay], 0);
+                R_B.p1.moveTo([R_B.p2.X(), R_B.p2.Y() - N2len * By], 0);
+                // board.update(); // i.d.R. nicht n&ouml;tig
+            }
+
+            var onDrag = function () { try { updateAll(); } catch (e) { console.error(e); } };
+            phiSlider.on('drag', onDrag);
+            phiSlider.on('up', onDrag);
+            try { if (phiSlider.point3) { phiSlider.point3.on('drag', onDrag); phiSlider.point3.on('up', onDrag); } } catch (e) { }
+
+            // Initial
+            updateAll();
+        }
+
+        runMecLib(brd1, content, continueCode);
+
+        // =====================================================================
+        // === ENDE ONYX-CODE ================================================
+        // =====================================================================
+    </script>
+</body>
+
+</html>

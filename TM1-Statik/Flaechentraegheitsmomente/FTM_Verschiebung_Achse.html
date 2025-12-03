@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="de">
+
+<head>
+    <meta charset="UTF-8" />
+    <title>MecLib / JSXGraph Aufgabe</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <!-- JSXGraph CSS -->
+    <link rel="stylesheet" href="https://jsxgraph.org/distrib/jsxgraph.css" />
+
+    <!-- JSXGraph JS -->
+    <script src="https://jsxgraph.org/distrib/jsxgraphcore.js"></script>
+
+    <!-- Deine MecLib-/ONYX-Erweiterung aus GitHub -->
+    <script src="https://cdn.jsdelivr.net/gh/Fkaule/TM_JSX_Graph@main/MecLibONYX.js"></script>
+
+    <style>
+        body {
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            margin: 1rem;
+        }
+
+        h1 {
+            font-size: 1.4rem;
+            margin-bottom: 0.5rem;
+        }
+
+        #JSX_CONTAINER_ID {
+            width: 700px;
+            height: 260px;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Interaktive MecLib-Aufgabe</h1>
+
+    <!-- Container für das Board -->
+    <div id="JSX_CONTAINER_ID" class="jxgbox"></div>
+
+    <script>
+        // =====================================================================
+        // === ONYX-CODE HIER EINFÜGEN =========================================
+        // =====================================================================
+
+        (() => {
+            // Rahmen aus
+            const CID = 'JSX_CONTAINER_ID';
+            const host = document.getElementById(CID);
+            if (!host) return;
+            host.style.border = "none";
+
+            // vorhandenes Board freigeben
+            try {
+                if (window.JXG && JXG.JSXGraph && JXG.JSXGraph.boards) {
+                    for (const k in JXG.JSXGraph.boards) {
+                        const b = JXG.JSXGraph.boards[k];
+                        if (b && b.container && b.container.id === CID) JXG.JSXGraph.freeBoard(b);
+                    }
+                }
+            } catch (e) { }
+
+            /****************************************************
+             * Verschobenes KS (x̄ / y) + 3 Graphen rechts:
+             *  1) J_{x̄x̄}(&Delta;y)  (Parabel)
+             *  2) J_{yy} = I_y  (konstante Linie)
+             *  3) J_{x̄ȳ}(&Delta;y)   (0-Linie)
+             * Gemeinsame Y-Skala f&uuml;r alle drei Panels!
+             ****************************************************/
+            const cfg = {
+                boardWidthPx: 700,
+                boardHeightPx: 400,
+                bbox: { left: -34, top: 30, right: 34, bottom: -7 },
+
+                // Layout
+                leftFrac: 1 / 3,
+                gapX: 2.4,
+                padLeft: 1.0,
+                padRight: 1.0,
+                padY: 2.0,
+
+                // Rechteck
+                rectWidthRatio: 0.86,
+                rectHeightRatio: 0.58,
+
+                // Slider (&Delta;y)
+                sliderY: -6.2,
+                sliderStep: 0.05,
+
+                // 3-Minipanels
+                panelGap: 1.0,
+
+                // Label-Offsets
+                axisLabelOffset: 1.1,
+                xbarLabelDx: 0.75,
+                ybarLabelDy: 1.5,
+                ybarLabelDx: 0.55,
+
+                // Typografie
+                font: { base: 16, axes: 20, big: 22, legend: 16, grid: 14 },
+
+                // Farben
+                col: {
+                    rectFill: '#a8d4ff',
+                    rectEdge: '#2b4c7e',
+                    baseAxes: '#000000',
+                    xiAxis: '#d33',     // x̄
+                    etaAxis: '#1f6aff',  // y (verschoben, aber ohne Strich)
+                    frame: '#e5e5e5',
+                    grid: '#d0d0d0',
+                    curve: '#9a9a9a'
+                },
+
+                // Strichst&auml;rken
+                sw: { rect: 2.5, baseAxes: 3, rotAxes: 3.2, graphAxes: 1.6, grid: 1, curves: 2.6 },
+
+                marker: 5
+            };
+
+            /********** Board & Aufteilung **********/
+            host.style.width = cfg.boardWidthPx + 'px';
+            host.style.height = cfg.boardHeightPx + 'px';
+
+            const brd = JXG.JSXGraph.initBoard(CID, {
+                boundingbox: [cfg.bbox.left, cfg.bbox.top, cfg.bbox.right, cfg.bbox.bottom],
+                axis: false, keepaspectratio: true, showNavigation: false, showCopyright: false
+            });
+
+            const L = cfg.bbox.left, R = cfg.bbox.right, T = cfg.bbox.top, B = cfg.bbox.bottom;
+            const W = R - L, split = L + W * cfg.leftFrac;
+
+            const leftX0 = L, leftX1 = split - cfg.gapX;
+            const rightX0 = split + cfg.gapX, rightX1 = R;
+
+            const leftInnerX0 = leftX0 + cfg.padLeft;
+            const leftInnerX1 = leftX1 - cfg.padLeft;
+            const rightInnerX0 = rightX0 + cfg.padRight;
+            const rightInnerX1 = rightX1 - cfg.padRight;
+            const innerYTop = T - cfg.padY;
+            const innerYBot = B + cfg.padY;
+
+            /********** LINKS: Querschnitt + Basisachsen + verschobenes KS **********/
+            const totalH = T - B;
+            const rectW = (leftInnerX1 - leftInnerX0) * cfg.rectWidthRatio;
+            const rectH = totalH * cfg.rectHeightRatio;
+
+            const cx = (leftInnerX0 + leftInnerX1) / 2;
+            const cy = (innerYTop + innerYBot) / 2;
+
+            const b = rectW, h = rectH;
+
+            // Rechteck-Ecken
+            const pA = brd.create('point', [cx - b / 2, cy - h / 2], { visible: false, fixed: true });
+            const pB = brd.create('point', [cx - b / 2, cy + h / 2], { visible: false, fixed: true });
+            const pC = brd.create('point', [cx + b / 2, cy + h / 2], { visible: false, fixed: true });
+            const pD = brd.create('point', [cx + b / 2, cy - h / 2], { visible: false, fixed: true });
+
+            brd.create('polygon', [pA, pB, pC, pD], {
+                borders: { strokeColor: cfg.col.rectEdge, strokeWidth: cfg.sw.rect },
+                fillColor: cfg.col.rectFill, fillOpacity: 0.85, fixed: true, highlight: false
+            });
+
+            // Basisachsen (schwarz): x, y (ohne Strich)
+            const baseXpos = [cx + b / 2 + 0.3, cy],
+                baseXneg = [cx - b / 2 - 0.3, cy],
+                baseYpos = [cx, cy + h / 2 + 0.3],
+                baseYneg = [cx, cy - h / 2 - 0.3];
+
+            brd.create('segment', [baseXneg, [cx, cy]], { strokeColor: cfg.col.baseAxes, strokeWidth: cfg.sw.baseAxes, fixed: true, highlight: false });
+            brd.create('arrow', [[cx, cy], baseXpos], { strokeColor: cfg.col.baseAxes, strokeWidth: cfg.sw.baseAxes, fixed: true, highlight: false });
+            brd.create('segment', [baseYneg, [cx, cy]], { strokeColor: cfg.col.baseAxes, strokeWidth: cfg.sw.baseAxes, fixed: true, highlight: false });
+            brd.create('arrow', [[cx, cy], baseYpos], { strokeColor: cfg.col.baseAxes, strokeWidth: cfg.sw.baseAxes, fixed: true, highlight: false });
+
+            // Labels (x, y) &ndash; ohne Strich
+            brd.create('text', [cx + cfg.ybarLabelDx, cy + h / 2 + cfg.ybarLabelDy,
+            "<span style='font-size:" + cfg.font.axes + "px; color:" + cfg.col.baseAxes + "; font-family:serif; font-style:italic;'>y</span>"
+            ], { fixed: true, display: 'html' });
+            brd.create('text', [cx + b / 2 + cfg.xbarLabelDx, cy - 0.1,
+            "<span style='font-size:" + cfg.font.axes + "px; color:" + cfg.col.baseAxes + "; font-family:serif; font-style:italic;'>x</span>"
+            ], { fixed: true, display: 'html' });
+
+            // Slider: &Delta;y &isin; [-h/2, h/2]
+            const sMin = -h / 2, sMax = h / 2;
+            const sYp = brd.create('slider',
+                [[leftInnerX0, cfg.sliderY], [leftInnerX1, cfg.sliderY], [sMin, 0, sMax]],
+                { withLabel: false, snapWidth: cfg.sliderStep }
+            );
+            brd.create('text', [leftInnerX0 + (leftInnerX1 - leftInnerX0) / 2, cfg.sliderY + 2.5,
+            "<span style='font-size:" + cfg.font.base + "px; font-family:serif; font-style:italic;'>&Delta;y</span>"
+            ], { fixed: true, display: 'html', anchorX: 'middle' });
+            brd.create('text', [() => leftInnerX1 + 0.6, () => cfg.sliderY - 0.02,
+            () => {
+                const pct = Math.round((sYp.Value() / h) * 100); // &minus;50 &hellip; +50 %
+                return "<span style='font-size:" + cfg.font.base + "px;'>" + pct + "%</span>";
+            }
+            ], { fixed: true, display: 'html', anchorX: 'left' });
+
+            // Verschobenes KS: x̄ (rot), y (blau, ohne Strich), durch O&prime;=(cx, cy+&Delta;y)
+            const rMax = Math.min(cx - leftInnerX0, leftInnerX1 - cx, cy - innerYBot, innerYTop - cy);
+            const Laxis = rMax * 0.98;
+            const Llabel = Laxis + cfg.axisLabelOffset;
+
+            const Oxp = () => cx;
+            const Oyp = () => cy + sYp.Value();
+
+            const xbarPos = brd.create('point', [() => Oxp() + Laxis, () => Oyp()], { visible: false, fixed: true });
+            const xbarNeg = brd.create('point', [() => Oxp() - Laxis, () => Oyp()], { visible: false, fixed: true });
+            brd.create('segment', [xbarNeg, [() => Oxp(), () => Oyp()]], { strokeColor: cfg.col.xiAxis, strokeWidth: cfg.sw.rotAxes, fixed: true, highlight: false });
+            brd.create('arrow', [[() => Oxp(), () => Oyp()], xbarPos], { strokeColor: cfg.col.xiAxis, strokeWidth: cfg.sw.rotAxes, fixed: true, highlight: false });
+            // Label: x̄  (Makron: &#772;)
+            brd.create('text', [() => Oxp() + Llabel, () => Oyp(),
+            "<span style='font-size:" + cfg.font.big + "px; color:" + cfg.col.xiAxis + "; font-family:serif; font-style:italic;'>x&#772;</span>"
+            ], { fixed: true, display: 'html', anchorY: 'middle' });
+
+            const yPos = brd.create('point', [() => Oxp(), () => Oyp() + Laxis], { visible: false, fixed: true });
+            const yNeg = brd.create('point', [() => Oxp(), () => Oyp() - Laxis], { visible: false, fixed: true });
+            brd.create('segment', [yNeg, [() => Oxp(), () => Oyp()]], { strokeColor: cfg.col.etaAxis, strokeWidth: cfg.sw.rotAxes, fixed: true, highlight: false });
+            brd.create('arrow', [[() => Oxp(), () => Oyp()], yPos], { strokeColor: cfg.col.etaAxis, strokeWidth: cfg.sw.rotAxes, fixed: true, highlight: false });
+            // Label: y (ohne Strich)
+            brd.create('text', [() => Oxp(), () => Oyp() + Llabel,
+            "<span style='font-size:" + cfg.font.big + "px; color:" + cfg.col.etaAxis + "; font-family:serif; font-style:italic;'>y</span>"
+            ], { fixed: true, display: 'html', anchorX: 'middle' });
+
+            // x̄-Linie (rot gestrichelt)
+            const pL = brd.create('point', [() => cx - b / 2, () => Oyp()], { visible: false, fixed: true });
+            const pR = brd.create('point', [() => cx + b / 2, () => Oyp()], { visible: false, fixed: true });
+            brd.create('segment', [pL, pR], { dash: 2, strokeColor: cfg.col.xiAxis, strokeWidth: cfg.sw.rotAxes, fixed: true, highlight: false });
+
+            // --- &Delta;y-Bema&szlig;ung rechts neben dem Querschnitt --------------------------
+            // Abstand der Bema&szlig;ung vom Rechteckrand:
+            const dimOffset = -5;         // >0 = rechts vom Rechteck, <0 = links
+            const extGap = 0.18;        // kleiner Abstand der Hilfslinien vom Rand
+            const xDim = () => cx + b / 2 + dimOffset;
+
+            // Endpunkte der Ma&szlig;linie (dynamisch mit Slider):
+            const pDim0 = brd.create('point', [() => xDim(), () => cy], { visible: false, fixed: true });
+            const pDim1 = brd.create('point', [() => xDim(), () => Oyp()], { visible: false, fixed: true });
+
+            // Doppelpfeil:
+            brd.create('line', [pDim0, pDim1], {
+                straightFirst: false, straightLast: false,
+                firstArrow: true, lastArrow: true,
+                strokeColor: '#444', strokeWidth: 2, fixed: true, highlight: false
+            });
+
+            // Hilfslinien vom Rechteckrand zur Ma&szlig;linie (oben/unten):
+            brd.create('segment', [
+                [() => cx + b / 2 + extGap, () => cy],
+                [() => xDim(), () => cy]
+            ], { strokeColor: '#666', strokeWidth: 1.6, fixed: true, highlight: false });
+
+            brd.create('segment', [
+                [() => cx + b / 2 + extGap, () => Oyp()],
+                [() => xDim(), () => Oyp()]
+            ], { strokeColor: '#666', strokeWidth: 1.6, fixed: true, highlight: false });
+
+            // Ma&szlig;text (&Delta;y) mittig:
+            brd.create('text', [
+                () => xDim() + 0.35,
+                () => (cy + Oyp()) / 2,
+                "<span style='font-size:" + cfg.font.base + "px; font-family:serif; font-style:italic;'>&Delta;y</span>"
+            ], { fixed: true, display: 'html', anchorX: 'left', anchorY: 'middle' });
+
+
+
+            /********** TR&Auml;GHEITSGR&Ouml;SSEN **********/
+            const Ix = b * Math.pow(h, 3) / 12;   // um Schwerpunkt (x)
+            const Iy = h * Math.pow(b, 3) / 12;   // um Schwerpunkt (y)
+            const areaA = b * h;
+
+            /********** RECHTS: 3 Mini-Graphs mit gemeinsamer Y-Skala **********/
+            const gxAllMin = rightInnerX0, gxAllMax = rightInnerX1;
+            const totalRightW = gxAllMax - gxAllMin;
+            const nPanels = 3;
+            const gapsTotal = cfg.panelGap * (nPanels - 1);
+            const panelW = (totalRightW - gapsTotal) / nPanels;
+
+            function panelX(i) {
+                const x0 = gxAllMin + i * (panelW + cfg.panelGap);
+                const x1 = x0 + panelW;
+                return [x0, x1];
+            }
+            function drawFrame(x0, x1) {
+                const segFix = { strokeColor: cfg.col.frame, strokeWidth: 1.2, fixed: true, highlight: false };
+                brd.create('segment', [[x0, innerYBot], [x1, innerYBot]], segFix);
+                brd.create('segment', [[x0, innerYTop], [x1, innerYTop]], segFix);
+                brd.create('segment', [[x0, innerYBot], [x0, innerYTop]], segFix);
+                brd.create('segment', [[x1, innerYBot], [x1, innerYTop]], segFix);
+            }
+
+            // Funktionen
+            const Jxx_of_y = (dy) => Ix + areaA * dy * dy;  // Parallelachsen
+            const yMin = sMin, yMax = sMax;             // &Delta;y-Bereich
+
+            // &mdash; Globale Y-Skala &mdash;
+            const candidates = [
+                Jxx_of_y(0),
+                Jxx_of_y(yMin),
+                Jxx_of_y(yMax),
+                Iy,
+                0 // f&uuml;r J_{x̄ȳ}
+            ];
+            let JglobMin = Math.min.apply(null, candidates);
+            let JglobMax = Math.max.apply(null, candidates);
+            if (!(JglobMax > JglobMin)) {
+                const base = Math.max(1, Math.abs(JglobMax));
+                JglobMin = JglobMax - 0.1 * base;
+                JglobMax = JglobMax + 0.1 * base;
+            }
+            const pad = (JglobMax - JglobMin) * 0.05;
+            JglobMin -= pad; JglobMax += pad;
+
+            function mapJglobToY(J) {
+                return innerYBot + (J - JglobMin) / (JglobMax - JglobMin) * (innerYTop - innerYBot);
+            }
+
+            /* ===== Panel 1: J_{x̄x̄}(&Delta;y) ===== */
+            {
+                const [x0, x1] = panelX(0);
+                const mapDyToX1 = (dy) => x0 + (dy - yMin) / (yMax - yMin) * (x1 - x0);
+                const axX1 = mapDyToX1(0);
+                const axY1 = mapJglobToY(0);
+
+                drawFrame(x0, x1);
+
+                // Achsen
+                brd.create('line', [[x0, axY1], [x1, axY1]], {
+                    straightFirst: false, straightLast: false, lastArrow: true,
+                    strokeWidth: cfg.sw.graphAxes, strokeColor: '#444', fixed: true, highlight: false
+                });
+                brd.create('text', [x1, axY1 + 1.5,
+                    "<span style='font-size:" + cfg.font.base + "px; font-family:serif; font-style:italic;'>&Delta;y</span>"
+                ], { fixed: true, display: 'html', anchorX: 'right' });
+
+                brd.create('line', [[axX1, innerYBot - 0.8], [axX1, innerYTop]], {
+                    straightFirst: false, straightLast: false, lastArrow: true,
+                    strokeWidth: cfg.sw.graphAxes, strokeColor: '#444', fixed: true, highlight: false
+                });
+                // Label: J_{x̄x̄}
+                brd.create('text', [axX1 - 0.35, innerYTop + 1,
+                "<span style='font-size:" + cfg.font.base + "px;'>J<sub>x&#772;x&#772;</sub>(&Delta;y)</span>"
+                ], { fixed: true, display: 'html' });
+
+                // Parabel + Marker
+                [-0.25, 0, 0.25].forEach(fr => {
+                    const dy = fr * h, x = mapDyToX1(dy);
+                    brd.create('segment', [[x, innerYBot], [x, innerYTop]], {
+                        strokeColor: cfg.col.grid, dash: 1, strokeWidth: cfg.sw.grid, fixed: true, highlight: false
+                    });
+                    brd.create('text', [x, innerYBot - 2,
+                        "<span style='font-size:" + cfg.font.grid + "px;'>" + (fr * 100) + "%</span>"
+                    ], { fixed: true, display: 'html', anchorX: 'middle' });
+                });
+
+                brd.create('curve', [
+                    (dy) => mapDyToX1(dy),
+                    (dy) => mapJglobToY(Jxx_of_y(dy)),
+                    yMin, yMax
+                ], { strokeColor: cfg.col.curve, dash: 2, strokeWidth: cfg.sw.curves, fixed: true, highlight: false });
+
+                brd.create('point', [
+                    () => mapDyToX1(sYp.Value()),
+                    () => mapJglobToY(Jxx_of_y(sYp.Value()))
+                ], { name: '', face: 'o', size: cfg.marker, strokeColor: cfg.col.xiAxis, fillColor: cfg.col.xiAxis, fixed: true, highlight: false });
+            }
+
+            /* ===== Panel 2: J_{yy} (konstant) ===== */
+            {
+                const [x0, x1] = panelX(1);
+                const mapDyToX2 = (dy) => x0 + (dy - yMin) / (yMax - yMin) * (x1 - x0);
+                const axX2 = mapDyToX2(0);
+                const axY2 = mapJglobToY(0);
+
+                drawFrame(x0, x1);
+
+                brd.create('line', [[x0, axY2], [x1, axY2]], {
+                    straightFirst: false, straightLast: false, lastArrow: true,
+                    strokeWidth: cfg.sw.graphAxes, strokeColor: '#444', fixed: true, highlight: false
+                });
+                brd.create('text', [x1, axY2 + 1.5,
+                    "<span style='font-size:" + cfg.font.base + "px; font-family:serif; font-style:italic;'>&Delta;y</span>"
+                ], { fixed: true, display: 'html', anchorX: 'right' });
+
+                brd.create('line', [[axX2, innerYBot - 0.8], [axX2, innerYTop]], {
+                    straightFirst: false, straightLast: false, lastArrow: true,
+                    strokeWidth: cfg.sw.graphAxes, strokeColor: '#444', fixed: true, highlight: false
+                });
+                brd.create('text', [axX2 - 0.35, innerYTop + 1,
+                "<span style='font-size:" + cfg.font.base + "px;'>J<sub>yy</sub></span>"
+                ], { fixed: true, display: 'html' });
+
+                [-0.25, 0, 0.25].forEach(fr => {
+                    const dy = fr * h, x = mapDyToX2(dy);
+                    brd.create('segment', [[x, innerYBot], [x, innerYTop]], {
+                        strokeColor: cfg.col.grid, dash: 1, strokeWidth: cfg.sw.grid, fixed: true, highlight: false
+                    });
+                    brd.create('text', [x, innerYBot - 2,
+                        "<span style='font-size:" + cfg.font.grid + "px;'>" + (fr * 100) + "%</span>"
+                    ], { fixed: true, display: 'html', anchorX: 'middle' });
+                });
+
+                brd.create('segment', [[x0, mapJglobToY(Iy)], [x1, mapJglobToY(Iy)]], {
+                    strokeColor: cfg.col.curve, dash: 2, strokeWidth: cfg.sw.curves, fixed: true, highlight: false
+                });
+
+                brd.create('point', [
+                    () => mapDyToX2(sYp.Value()),
+                    () => mapJglobToY(Iy)
+                ], { name: '', face: 'o', size: cfg.marker, strokeColor: cfg.col.etaAxis, fillColor: cfg.col.etaAxis, fixed: true, highlight: false });
+            }
+
+            /* ===== Panel 3: J_{x̄ȳ}(&Delta;y) (0-Linie) ===== */
+            {
+                const [x0, x1] = panelX(2);
+
+                const mapDyToX3 = (dy) => x0 + (dy - yMin) / (yMax - yMin) * (x1 - x0);
+                const axX3 = mapDyToX3(0);
+                const axY3 = mapJglobToY(0);
+
+                drawFrame(x0, x1);
+
+                brd.create('line', [[x0, axY3], [x1, axY3]], {
+                    straightFirst: false, straightLast: false, lastArrow: true,
+                    strokeWidth: cfg.sw.graphAxes, strokeColor: '#444', fixed: true, highlight: false
+                });
+                brd.create('text', [x1, axY3 + 1.5,
+                    "<span style='font-size:" + cfg.font.base + "px; font-family:serif; font-style:italic;'>&Delta;y</span>"
+                ], { fixed: true, display: 'html', anchorX: 'right' });
+
+                brd.create('line', [[axX3, innerYBot - 0.8], [axX3, innerYTop]], {
+                    straightFirst: false, straightLast: false, lastArrow: true,
+                    strokeWidth: cfg.sw.graphAxes, strokeColor: '#444', fixed: true, highlight: false
+                });
+                // Label: J_{x̄ȳ}
+                brd.create('text', [axX3 - 0.35, innerYTop + 1,
+                "<span style='font-size:" + cfg.font.base + "px;'>J<sub>x&#772;y&#772;</sub>(&Delta;y)</span>"
+                ], { fixed: true, display: 'html' });
+
+                [-0.25, 0, 0.25].forEach(fr => {
+                    const dy = fr * h;
+                    const x = mapDyToX3(dy);
+                    brd.create('segment', [[x, innerYBot], [x, innerYTop]], {
+                        strokeColor: cfg.col.grid, dash: 1, strokeWidth: cfg.sw.grid, fixed: true, highlight: false
+                    });
+                    brd.create('text', [x, innerYBot - 2,
+                        "<span style='font-size:" + cfg.font.grid + "px;'>" + (fr * 100) + "%</span>"
+                    ], { fixed: true, display: 'html', anchorX: 'middle' });
+                });
+
+                // Null-Linie (Referenz)
+                brd.create('segment', [[x0, mapJglobToY(0)], [x1, mapJglobToY(0)]], {
+                    strokeColor: cfg.col.curve, dash: 2, strokeWidth: cfg.sw.curves, fixed: true, highlight: false
+                });
+
+                // Marker (liegt auf Null)
+                brd.create('point', [
+                    () => mapDyToX3(sYp.Value()),
+                    () => mapJglobToY(0)
+                ], { name: '', face: 'o', size: cfg.marker, strokeColor: '#666', fillColor: '#666', fixed: true, highlight: false });
+            }
+        })(); // IIFE Ende
+
+        // =====================================================================
+        // === ENDE ONYX-CODE ================================================
+        // =====================================================================
+    </script>
+</body>
+
+</html>

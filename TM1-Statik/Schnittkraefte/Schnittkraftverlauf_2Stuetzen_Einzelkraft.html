@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="de">
+
+<head>
+    <meta charset="UTF-8" />
+    <title>MecLib / JSXGraph Aufgabe</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <!-- JSXGraph CSS -->
+    <link rel="stylesheet" href="https://jsxgraph.org/distrib/jsxgraph.css" />
+
+    <!-- JSXGraph JS -->
+    <script src="https://jsxgraph.org/distrib/jsxgraphcore.js"></script>
+
+    <!-- Deine MecLib-/ONYX-Erweiterung aus GitHub -->
+    <script src="https://cdn.jsdelivr.net/gh/Fkaule/TM_JSX_Graph@main/MecLibONYX.js"></script>
+
+    <style>
+        body {
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            margin: 1rem;
+        }
+
+        h1 {
+            font-size: 1.4rem;
+            margin-bottom: 0.5rem;
+        }
+
+        #JSX_CONTAINER_ID {
+            width: 700px;
+            height: 260px;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Interaktive MecLib-Aufgabe</h1>
+
+    <!-- Container für das Board -->
+    <div id="JSX_CONTAINER_ID" class="jxgbox"></div>
+
+    <script>
+        // =====================================================================
+        // === ONYX-CODE HIER EINFÜGEN =========================================
+        // =====================================================================
+
+        // === Sicht & Grundsetup (ONYX / meclib) ===
+        document.getElementById('JSX_CONTAINER_ID').style.border = "none";
+        JXG.Options.grid.majorStep = 0;
+
+        // Globale Parameter
+        window.L = 10;
+        window.force_length = 1.5;
+        window.yMin = -10;            // Unterer Rand
+        window.yMax = 5;              // Oberer Rand
+
+        var brd = initMecLib('JSX_CONTAINER_ID');
+
+        // === content ===
+        var content = [
+            ["grid", "", "", -3, window.L + 2, window.yMin, window.yMax, 40],
+            ["beam", "", [0, 0], [window.L, 0], 0.12],
+            ["fix12", "A", [0, 0], 0],
+            ["fix1", "B", [window.L, 0], 0],
+            ["force", "F", [window.L / 2, -window.force_length], [window.L / 2, 0], -1],
+            ["force", "R_A", [0, 0.6], [0, 0], -1],
+            ["force", "R_B", [window.L, 0.6], [window.L, 0], -1]
+        ];
+
+        function continueCode() {
+            var L = window.L;
+            var P0 = 1000;
+            var kN = 1 / 750, kQ = -1 / 750, kM = -1 / 2000;  // Diagrammskalierung
+            var yN = -3.0, yQ = -5.0, yM = -7.0;   // Baselines
+            var xSy = 2.3, phiSy = 3.1;
+
+            // Objekte (richtige Indizes)
+            var Fext = objects[4], RA = objects[5], RB = objects[6];
+
+            Fext.p2.setAttribute({ fixed: true }); Fext.p1.setAttribute({ fixed: false });
+            RA.p2.setAttribute({ fixed: true }); RA.p1.setAttribute({ fixed: false });
+            RB.p2.setAttribute({ fixed: true }); RB.p1.setAttribute({ fixed: false });
+
+            var forceLayer = 9, diagLayer = 6;
+            [Fext, RA, RB].forEach(function (f) {
+                try {
+                    f.setAttribute({ layer: forceLayer });
+                    if (f.p1) f.p1.setAttribute({ layer: forceLayer });
+                    if (f.p2) f.p2.setAttribute({ layer: forceLayer });
+                } catch (e) { }
+            });
+
+            // Slider
+            var xSlider = board.create('slider', [[0, xSy], [L, xSy], [0, L / 2, L]], { fixed: false, snapWidth: 1, label: { visible: false } });
+            var phiSlider = board.create('slider', [[0, phiSy], [L, phiSy], [-180, 0, 180]], { fixed: false, snapWidth: 15, label: { visible: false } });
+            [xSlider, phiSlider].forEach(function (s) {
+                try {
+                    if (s.point1) s.point1.setAttribute({ fixed: true });
+                    if (s.point2) s.point2.setAttribute({ fixed: true });
+                    if (s.point3) s.point3.setAttribute({ fixed: false });
+                } catch (e) { }
+            });
+
+            board.create('text', [L + 0.2, xSy, function () { return 'x = ' + (xSlider.Value() / L).toFixed(1) + 'L'; }], { fixed: true, layer: forceLayer });
+            board.create('text', [L + 0.2, phiSy, function () { return '&phi; = ' + phiSlider.Value().toFixed(0) + '°'; }], { fixed: true, layer: forceLayer });
+
+            // Pfeill&auml;nge
+            var len0 = (function () { var dx = Fext.p1.X() - Fext.p2.X(), dy = Fext.p1.Y() - Fext.p2.Y(), d = Math.sqrt(dx * dx + dy * dy); return d > 1e-9 ? d : window.force_length; })();
+
+            // *** WICHTIG: meclib zeichnet p1&rarr;p2 (Spitze bei p2).
+            // F&uuml;r "F nach unten" muss p1 &Uuml;BER der Basis liegen. ***
+            function setForce(x, deg) {
+                var rad = deg * Math.PI / 180;
+                Fext.p2.moveTo([x, 0], 0);                        // Basis (Pfeilspitze) bleibt am Balken
+                var tailx = x - len0 * Math.sin(rad);             // Tail = p1 wird so gesetzt, dass Richtung nach unten zeigt
+                var taily = 0 + len0 * Math.cos(rad);
+                Fext.p1.moveTo([tailx, taily], 0);
+            }
+
+            // Reaktionen (analytisch)
+            function reactions(x, deg) {
+                var rad = deg * Math.PI / 180;
+                var Fx = P0 * Math.sin(rad);
+                var Fy = -P0 * Math.cos(rad);
+                var Ax = -Fx;
+                var By = (-Fy) * (x / L);
+                var Ay = -Fy - By;
+                return { Fx: Fx, Fy: Fy, Ax: Ax, Ay: Ay, By: By };
+            }
+
+            // Diagramme
+            var nCurve = board.create('curve', [[], []], { strokeColor: '#2d6cdf', strokeWidth: 2, layer: diagLayer });
+            var nFill = board.create('polygon', [
+                board.create('point', [0, yN], { visible: false }),
+                board.create('point', [0, yN], { visible: false }),
+                board.create('point', [0, yN], { visible: false }),
+                board.create('point', [0, yN], { visible: false })
+            ], { fillColor: '#2d6cdf', fillOpacity: 0.18, borders: { visible: false }, layer: diagLayer });
+
+            var qCurve = board.create('curve', [[], []], { strokeColor: '#00897b', strokeWidth: 2, layer: diagLayer });
+            var qFill1 = board.create('polygon', [
+                board.create('point', [0, yQ], { visible: false }),
+                board.create('point', [0, yQ], { visible: false }),
+                board.create('point', [0, yQ], { visible: false }),
+                board.create('point', [0, yQ], { visible: false })
+            ], { fillColor: '#00897b', fillOpacity: 0.18, borders: { visible: false }, layer: diagLayer });
+            var qFill2 = board.create('polygon', [
+                board.create('point', [0, yQ], { visible: false }),
+                board.create('point', [0, yQ], { visible: false }),
+                board.create('point', [0, yQ], { visible: false }),
+                board.create('point', [0, yQ], { visible: false })
+            ], { fillColor: '#00897b', fillOpacity: 0.18, borders: { visible: false }, layer: diagLayer });
+
+            var mCurve = board.create('curve', [[], []], { strokeColor: '#e53935', strokeWidth: 2, layer: diagLayer });
+            var mFillL = board.create('polygon', [
+                board.create('point', [0, yM], { visible: false }),
+                board.create('point', [0, yM], { visible: false }),
+                board.create('point', [0, yM], { visible: false })
+            ], { fillColor: '#e53935', fillOpacity: 0.18, borders: { visible: false }, layer: diagLayer });
+            var mFillR = board.create('polygon', [
+                board.create('point', [0, yM], { visible: false }),
+                board.create('point', [0, yM], { visible: false }),
+                board.create('point', [0, yM], { visible: false })
+            ], { fillColor: '#e53935', fillOpacity: 0.18, borders: { visible: false }, layer: diagLayer });
+
+            board.create('text', [-0.6, yN, 'N'], { fixed: true, layer: diagLayer });
+            board.create('text', [-0.6, yQ, 'Q'], { fixed: true, layer: diagLayer });
+            board.create('text', [-0.6, yM, 'M'], { fixed: true, layer: diagLayer });
+
+            function updateAll() {
+                var x = xSlider.Value(), phi = phiSlider.Value();
+                setForce(x, phi);
+
+                var R = reactions(x, phi);
+                var N2len = len0 / P0;
+
+                // Reaktionspfeile optisch nach oben: p1 unterhalb der Basis (p2) platzieren
+                RA.p1.moveTo([RA.p2.X() - N2len * R.Ax, RA.p2.Y() - N2len * R.Ay], 0);
+                RB.p1.moveTo([RB.p2.X(), RB.p2.Y() - N2len * R.By], 0);
+
+                // N
+                var Nx = R.Ax, yNx = yN + kN * Nx;
+                nCurve.dataX = [0, 0, x, x, L];
+                nCurve.dataY = [yN, yNx, yNx, yN, yN];
+                nFill.vertices[0].moveTo([0, yN], 0);
+                nFill.vertices[1].moveTo([0, yNx], 0);
+                nFill.vertices[2].moveTo([x, yNx], 0);
+                nFill.vertices[3].moveTo([x, yN], 0);
+
+                // Q
+                var Q1 = R.Ay, Q2 = R.Ay + R.Fy, yQ1 = yQ + kQ * Q1, yQ2 = yQ + kQ * Q2;
+                qCurve.dataX = [0, 0, x, x, L, L];
+                qCurve.dataY = [yQ, yQ1, yQ1, yQ2, yQ2, yQ];
+                qFill1.vertices[0].moveTo([0, yQ], 0);
+                qFill1.vertices[1].moveTo([0, yQ1], 0);
+                qFill1.vertices[2].moveTo([x, yQ1], 0);
+                qFill1.vertices[3].moveTo([x, yQ], 0);
+                qFill2.vertices[0].moveTo([x, yQ], 0);
+                qFill2.vertices[1].moveTo([x, yQ2], 0);
+                qFill2.vertices[2].moveTo([L, yQ2], 0);
+                qFill2.vertices[3].moveTo([L, yQ], 0);
+
+                // M (linker Teil + rechter Teil gef&uuml;llt)
+                var Mx = R.Ay * x, yMx = yM + kM * Mx;
+                mCurve.dataX = [0, x, L];
+                mCurve.dataY = [yM, yMx, yM];
+                // Links: (0,yM) &ndash; (x,yM) &ndash; (x,yMx)
+                mFillL.vertices[0].moveTo([0, yM], 0);
+                mFillL.vertices[1].moveTo([x, yM], 0);
+                mFillL.vertices[2].moveTo([x, yMx], 0);
+                // Rechts: (x,yM) &ndash; (L,yM) &ndash; (x,yMx)
+                mFillR.vertices[0].moveTo([x, yM], 0);
+                mFillR.vertices[1].moveTo([L, yM], 0);
+                mFillR.vertices[2].moveTo([x, yMx], 0);
+            }
+
+            var onDrag = function () { try { updateAll(); } catch (e) { console.error(e); } };
+            xSlider.on('drag', onDrag); xSlider.on('up', onDrag);
+            phiSlider.on('drag', onDrag); phiSlider.on('up', onDrag);
+            try {
+                if (xSlider.point3) { xSlider.point3.on('drag', onDrag); xSlider.point3.on('up', onDrag); }
+                if (phiSlider.point3) { phiSlider.point3.on('drag', onDrag); phiSlider.point3.on('up', onDrag); }
+            } catch (e) { }
+
+            updateAll();
+        }
+
+        runMecLib(brd, content, continueCode);
+
+        // =====================================================================
+        // === ENDE ONYX-CODE ================================================
+        // =====================================================================
+    </script>
+</body>
+
+</html>

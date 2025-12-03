@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="de">
+
+<head>
+    <meta charset="UTF-8" />
+    <title>MecLib / JSXGraph Aufgabe</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <!-- JSXGraph CSS -->
+    <link rel="stylesheet" href="https://jsxgraph.org/distrib/jsxgraph.css" />
+
+    <!-- JSXGraph JS -->
+    <script src="https://jsxgraph.org/distrib/jsxgraphcore.js"></script>
+
+    <!-- Deine MecLib-/ONYX-Erweiterung aus GitHub -->
+    <script src="https://cdn.jsdelivr.net/gh/Fkaule/TM_JSX_Graph@main/MecLibONYX.js"></script>
+
+    <style>
+        body {
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            margin: 1rem;
+        }
+
+        h1 {
+            font-size: 1.4rem;
+            margin-bottom: 0.5rem;
+        }
+
+        #JSX_CONTAINER_ID {
+            width: 700px;
+            height: 260px;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Interaktive MecLib-Aufgabe</h1>
+
+    <!-- Container für das Board -->
+    <div id="JSX_CONTAINER_ID" class="jxgbox"></div>
+
+    <script>
+        // =====================================================================
+        // === ONYX-CODE HIER EINFÜGEN =========================================
+        // =====================================================================
+
+        document.getElementById('JSX_CONTAINER_ID').style.border = "none";
+
+        /****************************************************
+         * Styling & Konfiguration
+         ****************************************************/
+        const cfg = {
+            boardWidthPx: 700,
+            boardHeightPx: 400,
+            bbox: { left: -34, top: 30, right: 34, bottom: -7 },
+            leftFrac: 1 / 3,
+            gapX: 2.4,
+            padLeft: 1.0,
+            padRight: 1.0,
+            padY: 2.0,
+            font: { base: 16, axes: 20, big: 22, legend: 16, grid: 14 },
+            col: {
+                rectFill: '#a8d4ff', rectEdge: '#2b4c7e', baseAxes: '#000000',
+                xiAxis: '#d33', etaAxis: '#1f6aff', frame: '#e5e5e5', grid: '#d0d0d0',
+                xiXiLine: '#cc7a7a', xiXiPt: '#e00', etaEtaLine: '#7a7acc', etaEtaPt: '#06f',
+                xiEtaLine: '#6aa06a', xiEtaPt: '#0a0'
+            },
+            sw: { rect: 2.5, baseAxes: 3, rotAxes: 3.2, graphAxes: 1.6, grid: 1, curves: 2.6 },
+            marker: 5,
+            xbarLabelDx: 0.75,
+            ybarLabelDy: 1.5,
+            ybarLabelDx: 0.55,
+            graphPhiLabelDx: 0.0,
+            graphPhiLabelDown: -2,
+            graphJLabelDy: -2,
+            gridLabelDy: -2,
+        };
+
+        const el = document.getElementById('JSX_CONTAINER_ID');
+        el.style.width = cfg.boardWidthPx + 'px';
+        el.style.height = cfg.boardHeightPx + 'px';
+
+        let brd = JXG.JSXGraph.initBoard('JSX_CONTAINER_ID', {
+            boundingbox: [cfg.bbox.left, cfg.bbox.top, cfg.bbox.right, cfg.bbox.bottom],
+            axis: false,
+            keepaspectratio: true,
+            showNavigation: false,
+            showCopyright: false
+        });
+
+        /* ===== Layout-Berechnung ===== */
+        const L = cfg.bbox.left, R = cfg.bbox.right, T = cfg.bbox.top, B = cfg.bbox.bottom;
+        const W = R - L, split = L + W * cfg.leftFrac;
+        const leftX0 = L, leftX1 = split - cfg.gapX;
+        const rightX0 = split + cfg.gapX, rightX1 = R;
+        const leftInnerX0 = leftX0 + cfg.padLeft;
+        const leftInnerX1 = leftX1 - cfg.padLeft;
+        const rightInnerX0 = rightX0 + cfg.padRight;
+        const rightInnerX1 = rightX1 - cfg.padRight;
+        const innerYTop = T - cfg.padY;
+        const innerYBot = B + cfg.padY;
+
+        /* ===== LINKS: Slider f&uuml;r b und h ===== */
+        const sliderHeight = -6.2;
+        const bhSliderProps = { snapWidth: 5, withLabel: false, fixed: false };
+        let sB = brd.create('slider', [[leftInnerX0 + 1.5, sliderHeight + 3], [leftInnerX1 - 1, sliderHeight + 3], [50, 100, 200]], bhSliderProps);
+        let sH = brd.create('slider', [[leftInnerX0 + 1.5, sliderHeight + 1], [leftInnerX1 - 1, sliderHeight + 1], [50, 100, 200]], bhSliderProps);
+
+        brd.create('text', [leftInnerX0 - 0.3, sliderHeight + 3, "<span style='font-size:16px;'>b</span>"], { fixed: true, display: 'html' });
+        brd.create('text', [leftInnerX0 - 0.3, sliderHeight + 1, "<span style='font-size:16px;'>h</span>"], { fixed: true, display: 'html' });
+        brd.create('text', [leftInnerX1 + 0.6, sliderHeight + 3, () => "<span style='font-size:16px;'>" + sB.Value().toFixed(0) + "</span>"], { fixed: true, display: 'html' });
+        brd.create('text', [leftInnerX1 + 0.6, sliderHeight + 1, () => "<span style='font-size:16px;'>" + sH.Value().toFixed(0) + "</span>"], { fixed: true, display: 'html' });
+
+        /* ===== LINKS: Rechteck-Darstellung mit Achsen ===== */
+        const cx = (leftInnerX0 + leftInnerX1) / 2;
+        const cy = (innerYTop + innerYBot) / 2;
+        const scale = 0.08;
+
+        let pA = brd.create('point', [() => cx - sB.Value() * scale / 2, () => cy - sH.Value() * scale / 2], { visible: false });
+        let pB = brd.create('point', [() => cx - sB.Value() * scale / 2, () => cy + sH.Value() * scale / 2], { visible: false });
+        let pC = brd.create('point', [() => cx + sB.Value() * scale / 2, () => cy + sH.Value() * scale / 2], { visible: false });
+        let pD = brd.create('point', [() => cx + sB.Value() * scale / 2, () => cy - sH.Value() * scale / 2], { visible: false });
+
+        brd.create('polygon', [pA, pB, pC, pD], {
+            borders: { strokeColor: cfg.col.rectEdge, strokeWidth: cfg.sw.rect },
+            fillColor: cfg.col.rectFill,
+            fillOpacity: 0.85,
+            fixed: true, highlight: false
+        });
+
+        let axLen = 3;
+        brd.create('arrow', [[cx - axLen, cy], [cx + axLen, cy]], {
+            strokeColor: cfg.col.baseAxes, strokeWidth: cfg.sw.baseAxes, fixed: true, highlight: false
+        });
+        brd.create('arrow', [[cx, cy - axLen], [cx, cy + axLen]], {
+            strokeColor: cfg.col.baseAxes, strokeWidth: cfg.sw.baseAxes, fixed: true, highlight: false
+        });
+
+        brd.create('text', [cx + axLen + 0.3, cy - 0.3,
+        "<span style='font-size:" + cfg.font.axes + "px; font-family:serif; font-style:italic;'>x</span>"],
+            { fixed: true, display: 'html' });
+
+        brd.create('text', [cx + 0.3, cy + axLen + 0.3,
+        "<span style='font-size:" + cfg.font.axes + "px; font-family:serif; font-style:italic;'>y</span>"],
+            { fixed: true, display: 'html' });
+
+        /***** RECHTS: MOMENTENVERL&Auml;UFE *****/
+        function b() { return sB.Value(); }
+        function h() { return sH.Value(); }
+        function Ix() { return h() * Math.pow(b(), 3) / 12; }
+        function Iy() { return b() * Math.pow(h(), 3) / 12; }
+        function Ixy() { return 0; }
+
+        function I_xixi(t) { return (Ix() + Iy()) / 2 + (Ix() - Iy()) / 2 * Math.cos(2 * t) + Ixy() * Math.sin(2 * t); }
+        function I_etaeta(t) { return (Ix() + Iy()) / 2 - (Ix() - Iy()) / 2 * Math.cos(2 * t) - Ixy() * Math.sin(2 * t); }
+        function I_xieta(t) { return (Iy() - Ix()) / 2 * Math.sin(2 * t) + Ixy() * Math.cos(2 * t); }
+
+        const gxMin = rightInnerX0, gxMax = rightInnerX1;
+        const tMin = 0, tMax = Math.PI;
+        function mapPhiToX(t) {
+            return gxMin + (t - tMin) / (tMax - tMin) * (gxMax - gxMin);
+        }
+
+        const maxIx = (200 ** 3 * 200) / 12;
+        const Ilo = -maxIx * 0.6;
+        const Ihi = maxIx * 1.05;
+        function mapItoY(I) {
+            return innerYBot + (I - Ilo) / (Ihi - Ilo) * (innerYTop - innerYBot);
+        }
+
+        const axX = mapPhiToX((tMin + tMax) / 2);
+        const axY = mapItoY(0);
+        brd.create('line', [[gxMin, axY], [gxMax, axY]], {
+            straightFirst: false, straightLast: false, lastArrow: true,
+            strokeWidth: cfg.sw.graphAxes, strokeColor: '#444', fixed: true, highlight: false
+        });
+        brd.create('text', [gxMax - cfg.graphPhiLabelDx, axY - cfg.graphPhiLabelDown,
+        "<span style='font-size:" + cfg.font.base + "px; font-family:serif; font-style:italic;'>&phi;</span>"],
+            { fixed: true, display: 'html', anchorX: 'right' });
+
+        brd.create('line', [[axX, innerYBot - 0.8], [axX, innerYTop]], {
+            straightFirst: false, straightLast: false, lastArrow: true,
+            strokeWidth: cfg.sw.graphAxes, strokeColor: '#444', fixed: true, highlight: false
+        });
+        brd.create('text', [axX - 0.35, innerYTop - cfg.graphJLabelDy,
+        "<span style='font-size:" + cfg.font.base + "px;'>I<sub>&xi;&xi;</sub>, I<sub>&eta;&eta;</sub>, I<sub>&xi;&eta;</sub></span>"],
+            { fixed: true, display: 'html' });
+
+        [0, 45, 90, 135, 180].forEach(deg => {
+            const t = deg * Math.PI / 180, x = mapPhiToX(t);
+            brd.create('segment', [[x, innerYBot], [x, innerYTop]], {
+                strokeColor: cfg.col.grid, dash: 1, strokeWidth: cfg.sw.grid, fixed: true, highlight: false
+            });
+            brd.create('text', [x, innerYBot + cfg.gridLabelDy,
+                "<span style='font-size:" + cfg.font.grid + "px;'>" + deg + "°</span>"],
+                { fixed: true, display: 'html', anchorX: 'middle' });
+        });
+
+        brd.create('segment', [[gxMin, mapItoY(0)], [gxMax, mapItoY(0)]], {
+            strokeColor: cfg.col.grid, dash: 1, strokeWidth: cfg.sw.grid, fixed: true, highlight: false
+        });
+
+        const dashed = { dash: 2, strokeWidth: cfg.sw.curves, fixed: true, highlight: false };
+        brd.create('curve', [t => mapPhiToX(t), t => mapItoY(I_xixi(t)), tMin, tMax], Object.assign({}, dashed, { strokeColor: cfg.col.xiXiLine }));
+        brd.create('curve', [t => mapPhiToX(t), t => mapItoY(I_etaeta(t)), tMin, tMax], Object.assign({}, dashed, { strokeColor: cfg.col.etaEtaLine }));
+        brd.create('curve', [t => mapPhiToX(t), t => mapItoY(I_xieta(t)), tMin, tMax], Object.assign({}, dashed, { strokeColor: cfg.col.xiEtaLine }));
+
+        // =====================================================================
+        // === ENDE ONYX-CODE ================================================
+        // =====================================================================
+    </script>
+</body>
+
+</html>

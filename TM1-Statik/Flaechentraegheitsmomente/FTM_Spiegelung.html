@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="de">
+
+<head>
+    <meta charset="UTF-8" />
+    <title>MecLib / JSXGraph Aufgabe</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <!-- JSXGraph CSS -->
+    <link rel="stylesheet" href="https://jsxgraph.org/distrib/jsxgraph.css" />
+
+    <!-- JSXGraph JS -->
+    <script src="https://jsxgraph.org/distrib/jsxgraphcore.js"></script>
+
+    <!-- Deine MecLib-/ONYX-Erweiterung aus GitHub -->
+    <script src="https://cdn.jsdelivr.net/gh/Fkaule/TM_JSX_Graph@main/MecLibONYX.js"></script>
+
+    <style>
+        body {
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            margin: 1rem;
+        }
+
+        h1 {
+            font-size: 1.4rem;
+            margin-bottom: 0.5rem;
+        }
+
+        #JSX_CONTAINER_ID {
+            width: 700px;
+            height: 260px;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Interaktive MecLib-Aufgabe</h1>
+
+    <!-- Container für das Board -->
+    <div id="JSX_CONTAINER_ID" class="jxgbox"></div>
+
+    <script>
+        // =====================================================================
+        // === ONYX-CODE HIER EINFÜGEN =========================================
+        // =====================================================================
+
+        (() => {
+            const CID = 'JSX_CONTAINER_ID';
+
+            // Vorhandenes Board im selben Container freigeben
+            try {
+                if (window.JXG && JXG.JSXGraph && JXG.JSXGraph.boards) {
+                    for (const k in JXG.JSXGraph.boards) {
+                        const b = JXG.JSXGraph.boards[k];
+                        if (b && b.container && b.container.id === CID) JXG.JSXGraph.freeBoard(b);
+                    }
+                }
+            } catch (e) { }
+
+            const host = document.getElementById(CID);
+            if (!host) return;
+            host.style.border = 'none';
+            host.style.width = '700px';
+            host.style.height = '400px';
+
+            // Symmetrischer Sichtbereich (Achsen in der Mitte); reichlich Platz f&uuml;r a<=12, b<=8
+            const cfg = {
+                bbox: { left: -14, top: 10, right: 14, bottom: -10 },
+                col: {
+                    triFill: '#a8d4ff', triEdge: '#2b4c7e',
+                    axes: '#000', grid: '#d0d0d0',
+                    pos: '#0a0', neg: '#d33', text: '#222'
+                },
+                sw: { tri: 2.5, axes: 2.6, grid: 1.0 },
+                font: { base: 16, axes: 18, big: 20 }
+            };
+
+            const brd = JXG.JSXGraph.initBoard(CID, {
+                boundingbox: [cfg.bbox.left, cfg.bbox.top, cfg.bbox.right, cfg.bbox.bottom],
+                axis: false, keepaspectratio: true, showNavigation: false, showCopyright: false
+            });
+
+            // Achsen (durch (0,0) = exakt mittig)
+            const x0 = brd.create('point', [cfg.bbox.left, 0], { visible: false });
+            const x1 = brd.create('point', [cfg.bbox.right, 0], { visible: false });
+            const y0 = brd.create('point', [0, cfg.bbox.bottom], { visible: false });
+            const y1 = brd.create('point', [0, cfg.bbox.top], { visible: false });
+            brd.create('line', [x0, x1], { straightFirst: false, straightLast: false, lastArrow: true, strokeColor: cfg.col.axes, strokeWidth: cfg.sw.axes, fixed: true });
+            brd.create('line', [y0, y1], { straightFirst: false, straightLast: false, lastArrow: true, strokeColor: cfg.col.axes, strokeWidth: cfg.sw.axes, fixed: true });
+            brd.create('text', [cfg.bbox.right - 0.8, 0.6,
+            "<span style='font-size:" + cfg.font.axes + "px'>x&#772;</span>"
+            ], { display: 'html', fixed: true });
+
+            brd.create('text', [0.6, cfg.bbox.top - 0.8,
+                "<span style='font-size:" + cfg.font.axes + "px'>y&#772;</span>"
+            ], { display: 'html', fixed: true });
+
+            // Zust&auml;nde f&uuml;r Spiegelungen
+            let sX = 1; // Spiegel an y-Achse: x -> sX*x  (Flip x)
+            let sY = 1; // Spiegel an x-Achse: y -> sY*y  (Flip y)
+
+            // Slider-Positionen (unter den Flip-Buttons)
+            const yBtns = -1.6;
+            const yA = -3.0;
+            const yB = -3.8;
+
+            // Slider: Breite a (2..12), H&ouml;he b (2..8) &mdash; erst anlegen, dann Fl&auml;che/Polygon erzeugen
+            const sA = brd.create('slider', [[-8, yA], [8, yA], [2, 6, 12]], { withLabel: false, snapWidth: 0.5 });
+            const sB = brd.create('slider', [[-8, yB], [8, yB], [2, 4, 8]], { withLabel: false, snapWidth: 0.5 });
+
+            // Dreieckspunkte & Polygon
+            const pO = brd.create('point', [0, 0], { visible: false, name: '' });
+            const pA = brd.create('point', [() => sX * sA.Value(), 0], { visible: false, name: '' });
+            const pB = brd.create('point', [0, () => sY * sB.Value()], { visible: false, name: '' });
+
+            brd.create('polygon', [pO, pA, pB], {
+                borders: { strokeColor: cfg.col.triEdge, strokeWidth: cfg.sw.tri },
+                fillColor: cfg.col.triFill, fillOpacity: 0.85, fixed: true, highlight: false
+            });
+
+            // Flip-Buttons direkt unter der x-Achse (mittig)
+            brd.create('button', [-3.5, yBtns, 'Flip x\u0304', () => { sX *= -1; brd.update(); }]); // x -> -x (Spiegel an y-Achse)
+            brd.create('button', [0.5, yBtns, 'Flip y\u0304', () => { sY *= -1; brd.update(); }]); // y -> -y (Spiegel an x-Achse)
+
+            // Slider-Beschriftungen & Werte (unter den Buttons)
+            brd.create('text', [-12.8, yA, "<span style='font-size:14px'>Breite b</span>"], { display: 'html', fixed: true });
+            brd.create('text', [12.5, yA, () => "<span style='font-size:14px;color:" + cfg.col.text + "'>" + sA.Value().toFixed(1) + "</span>"], { display: 'html', fixed: true, anchorX: 'right' });
+
+            brd.create('text', [-12.8, yB, "<span style='font-size:14px'>H&ouml;he h</span>"], { display: 'html', fixed: true });
+            brd.create('text', [12.5, yB, () => "<span style='font-size:14px;color:" + cfg.col.text + "'>" + sB.Value().toFixed(1) + "</span>"], { display: 'html', fixed: true, anchorX: 'right' });
+
+            // Fl&auml;chentr&auml;gheitsmomente (um x- & y-Achse durch (0,0))
+            const Ixx = () => sA.Value() * Math.pow(sB.Value(), 3) / 12;      // > 0
+            const Iyy = () => Math.pow(sA.Value(), 3) * sB.Value() / 12;      // > 0
+            const Ixy = () => (Math.pow(sA.Value(), 2) * Math.pow(sB.Value(), 2) / 24) * (sX * sY); // Vorzeichen = sX*sY
+
+            const fmt = v => (Math.abs(v) >= 1e5 || Math.abs(v) < 1e-3) ? v.toExponential(2) : v.toFixed(2);
+
+            // Anzeige rechts oben
+            brd.create('text', [13.2, 7.4, () =>
+                "<span style='font-size:" + cfg.font.base + "px'>J<sub>x&#772;x&#772;</sub> = " + fmt(Ixx()) + "</span>"
+            ], { display: 'html', fixed: true, anchorX: 'right' });
+
+            brd.create('text', [13.2, 6.4, () =>
+                "<span style='font-size:" + cfg.font.base + "px'>J<sub>y&#772;y&#772;</sub> = " + fmt(Iyy()) + "</span>"
+            ], { display: 'html', fixed: true, anchorX: 'right' });
+
+            brd.create('text', [13.2, 5.4, () => {
+                const val = Ixy(); const col = val >= 0 ? cfg.col.pos : cfg.col.neg;
+                return "<span style='font-size:" + cfg.font.base + "px'>J<sub>x&#772;y&#772;</sub> = " +
+                    "<span style='color:" + col + "'>" + fmt(val) + "</span></span>";
+            }], { display: 'html', fixed: true, anchorX: 'right' });
+        })();
+
+        // =====================================================================
+        // === ENDE ONYX-CODE ================================================
+        // =====================================================================
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="de">
+
+<head>
+    <meta charset="UTF-8" />
+    <title>MecLib / JSXGraph Aufgabe</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <!-- JSXGraph CSS -->
+    <link rel="stylesheet" href="https://jsxgraph.org/distrib/jsxgraph.css" />
+
+    <!-- JSXGraph JS -->
+    <script src="https://jsxgraph.org/distrib/jsxgraphcore.js"></script>
+
+    <!-- Deine MecLib-/ONYX-Erweiterung aus GitHub -->
+    <script src="https://cdn.jsdelivr.net/gh/Fkaule/TM_JSX_Graph@main/MecLibONYX.js"></script>
+
+    <style>
+        body {
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            margin: 1rem;
+        }
+
+        h1 {
+            font-size: 1.4rem;
+            margin-bottom: 0.5rem;
+        }
+
+        #JSX_CONTAINER_ID {
+            width: 700px;
+            height: 260px;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Interaktive MecLib-Aufgabe</h1>
+
+    <!-- Container für das Board -->
+    <div id="JSX_CONTAINER_ID" class="jxgbox"></div>
+
+    <script>
+        // =====================================================================
+        // === ONYX-CODE HIER EINFÜGEN =========================================
+        // =====================================================================
+
+        document.getElementById('JSX_CONTAINER_ID').style.height = '500px';                                    // adjust height
+        JXG.Options.text.useMathJax = true;
+        var brd = JXG.JSXGraph.initBoard('JSX_CONTAINER_ID', { axis: false, boundingbox: [-2, 10, 10, -2] }); // create board
+
+        var L = 5.0; // length of ladder
+
+        // Slider for the angle of the ladder
+        let angle = brd.create('slider', [[0.2, 9], [8, 9], [0, 45, 90]], {
+            snapWidth: 5,
+            strokeColor: 'blue', // Farbe der Slider-Linie
+            fillColor: 'lightblue', // Farbe der Slider-Griffe
+            precision: 0,
+            label: {
+                strokeColor: 'blue', // Farbe der Beschriftung
+                fontSize: 25         // Optional: Schriftgr&ouml;&szlig;e
+            }
+        });
+
+        var angle_label = brd.create('text', [-1.2, 9, "\\( \\alpha(^\\circ)\\)"], { fontSize: 25, color: 'blue' });
+
+
+        // Slider for the friction coefficient
+        let mu = brd.create('slider', [[0.2, 8], [8, 8], [0, 0.1, 0.4]], {
+            snapWidth: 0.05,
+            strokeColor: 'green', // Farbe der Slider-Linie
+            fillColor: 'lightgreen', // Farbe der Slider-Griffe
+            label: {
+                strokeColor: 'green', // Farbe der Beschriftung
+                fontSize: 25          // Optional: Schriftgr&ouml;&szlig;e
+            }
+        });
+
+        var muslider_label = brd.create('text', [-0.5, 8, "\\(\\mu\\)"], { fontSize: 25, color: 'green' });
+
+
+        // Slider for force position
+        let force_position = brd.create('slider', [[0.2, 7], [8, 7], [0, 0.3, 1]], {
+            snapWidth: 0.1,
+            precision: 1,
+            strokeColor: 'red', // Farbe der Slider-Linie
+            fillColor: 'red', // Farbe der Slider-Griffe
+            label: {
+                strokeColor: 'red', // Farbe der Beschriftung
+                fontSize: 25          // Optional: Schriftgr&ouml;&szlig;e
+            }
+        });
+
+        var position_label = brd.create('text', [-1.8, 7, "position"], { fontSize: 23, color: 'red' });
+
+
+        // Calculate the angle of the friction cone
+        function frictionAngle(muValue) {
+            return Math.atan(muValue);
+        }
+
+        // Point A (Startpoint of the ladder)
+        let pointA = function () {
+            return [
+                Math.cos(angle.Value() * Math.PI / 180) * L,
+                0
+            ];
+        };
+
+        // Point B (Endpoint of the ladder)
+        let pointB = function () {
+            return [
+                0,
+                Math.sin(angle.Value() * Math.PI / 180) * L
+            ];
+        };
+
+        // Draw the ladder
+        let ladder = brd.create('segment', [pointA, pointB], {
+            strokeWidth: 4,
+            strokeColor: 'black',
+            name: 'Ladder'
+        });
+
+        // Draw walls and floor as gray areas
+        let wallRegion = brd.create('polygon', [
+            [-2, 0],
+            [-2, 10],
+            [0, 10],
+            [0, 0]
+        ], {
+            fillColor: 'gray',
+            fillOpacity: 0.2,
+            withLines: false, // Keine Linien um die Punkte zeichnen
+            vertices: {       // Eigenschaften f&uuml;r die Punkte
+                visible: false, // Punkte ausblenden
+                fixed: true     // Punkte nicht verschiebbar machen
+            },
+            borders: {
+                strokeColor: 'gray',
+                highlight: false
+            }
+        });
+
+        let floorRegion = brd.create('polygon', [
+            [-2, 0],
+            [10, 0],
+            [10, -2],
+            [-2, -2]
+        ], {
+            fillColor: 'gray',
+            fillOpacity: 0.2,
+            withLines: false, // Keine Linien um die Punkte zeichnen
+            vertices: {       // Eigenschaften f&uuml;r die Punkte
+                visible: false, // Punkte ausblenden
+                fixed: true     // Punkte nicht verschiebbar machen
+            },
+            borders: {
+                strokeColor: 'gray',
+                highlight: false
+            }
+        });
+
+        // Friction cones at the base
+        let coneBase1 = brd.create('line', [pointA, [
+            function () { return pointA()[0] + Math.sin(frictionAngle(mu.Value())); },
+            function () { return pointA()[1] + Math.cos(frictionAngle(mu.Value())); }
+        ]], {
+            strokeColor: 'green',
+            dash: 1
+        });
+
+        let coneBase2 = brd.create('line', [pointA, [
+            function () { return pointA()[0] + Math.sin(-frictionAngle(mu.Value())); },
+            function () { return pointA()[1] + Math.cos(-frictionAngle(mu.Value())); }
+        ]], {
+            strokeColor: 'green',
+            dash: 1
+        });
+
+        // Friction cones at the wall
+        let coneWall1 = brd.create('line', [pointB, [
+            function () { return pointB()[0] + Math.cos(frictionAngle(mu.Value())); },
+            function () { return pointB()[1] + Math.sin(frictionAngle(mu.Value())); }
+        ]], {
+            strokeColor: 'green',
+            dash: 1
+        });
+
+        let coneWall2 = brd.create('line', [pointB, [
+            function () { return pointB()[0] + Math.cos(-frictionAngle(mu.Value())); },
+            function () { return pointB()[1] + Math.sin(-frictionAngle(mu.Value())); }
+        ]], {
+            strokeColor: 'green',
+            dash: 1
+        });
+
+        // Intersection of cones to create shaded area in positive x and y direction
+        let intersection1 = brd.create('intersection', [coneBase1, coneWall1, 0], { visible: false });
+        let intersection2 = brd.create('intersection', [coneBase1, coneWall2, 0], { visible: false });
+        let intersection3 = brd.create('intersection', [coneBase2, coneWall1, 0], { visible: false });
+        let intersection4 = brd.create('intersection', [coneBase2, coneWall2, 0], { visible: false });
+
+        let shadedRegion = brd.create('polygon', [
+            intersection1,
+            intersection2,
+            intersection4,
+            intersection3
+        ], {
+            fillColor: 'lightgreen',
+            fillOpacity: 0.3,
+            borders: {
+                strokeColor: 'yellow',
+                highlight: false
+            }
+        });
+
+        // Force vector
+        let midpoint = function () {
+            return [
+                (pointA()[0] + pointB()[0]) * force_position.Value(),
+                pointB()[1] - (pointA()[1] + pointB()[1]) * force_position.Value()
+            ];
+        };
+
+        let force = brd.create('arrow', [midpoint, [
+            function () { return midpoint()[0]; },
+            function () { return midpoint()[1] - 1; }
+        ]], {
+            name: '\\(\\vec{F_G}\\)',
+            strokeWidth: 2,
+            strokeColor: 'red',
+            withLabel: true,
+            label: {
+                strokeColor: 'red', // Textfarbe
+                fontSize: 25,        // Optional: Schriftgr&ouml;&szlig;e
+                offset: [-25, -20]
+            }
+        });
+
+        // Extend force vector line to show line of action upwards
+        let forceLine = brd.create('line', [midpoint, [
+            function () { return midpoint()[0]; },
+            function () { return midpoint()[1] + 10; }
+        ]], {
+            strokeColor: 'red',
+            dash: 2,
+            straightFirst: false,
+            straightLast: true
+        });
+
+        // Intersection point between force line and shaded region
+        let intersectionTest = brd.create('intersection', [forceLine, shadedRegion, 0], {
+            visible: true,
+            fillColor: 'black',
+            name: 'Schnittpunkt',
+            label: { fontSize: 25 }
+        });
+
+        // Draw angle alpha
+        let point0 = brd.create('point', [0, 0], {
+            visible: false, // Punkt unsichtbar machen
+            fixed: true     // Punkt nicht verschiebbar machen
+        });
+
+        let alphaAngle = brd.create('angle', [
+            pointB,
+            pointA,
+            point0
+        ], {
+            name: '\\(\\alpha\\)', // MathJax-Beschriftung
+            radius: 1.5,
+            withLabel: true,
+            strokeColor: 'blue', // Farbe des Winkelbogens
+            fillColor: 'lightblue', // Farbe der Fl&auml;che im Winkel
+            fillOpacity: 0.5, // Transparenz der Fl&auml;che (0 = durchsichtig, 1 = undurchsichtig)
+            label: {
+                strokeColor: 'blue', // Farbe der Beschriftung
+                fontSize: 25,         // Optional: Schriftgr&ouml;&szlig;e
+            },
+            vertices: {
+                visible: false, // Punkte ausblenden
+                fixed: true     // Punkte nicht verschiebbar machen
+            }
+        });
+
+        brd.update();
+
+        // =====================================================================
+        // === ENDE ONYX-CODE ================================================
+        // =====================================================================
+    </script>
+</body>
+
+</html>

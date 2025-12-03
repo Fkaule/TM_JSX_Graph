@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="de">
+
+<head>
+    <meta charset="UTF-8" />
+    <title>MecLib / JSXGraph Aufgabe</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <!-- JSXGraph CSS -->
+    <link rel="stylesheet" href="https://jsxgraph.org/distrib/jsxgraph.css" />
+
+    <!-- JSXGraph JS -->
+    <script src="https://jsxgraph.org/distrib/jsxgraphcore.js"></script>
+
+    <!-- Deine MecLib-/ONYX-Erweiterung aus GitHub -->
+    <script src="https://cdn.jsdelivr.net/gh/Fkaule/TM_JSX_Graph@main/MecLibONYX.js"></script>
+
+    <style>
+        body {
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            margin: 1rem;
+        }
+
+        h1 {
+            font-size: 1.4rem;
+            margin-bottom: 0.5rem;
+        }
+
+        #JSX_CONTAINER_ID {
+            width: 700px;
+            height: 260px;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Interaktive MecLib-Aufgabe</h1>
+
+    <!-- Container für das Board -->
+    <div id="JSX_CONTAINER_ID" class="jxgbox"></div>
+
+    <script>
+        // =====================================================================
+        // === ONYX-CODE HIER EINFÜGEN =========================================
+        // =====================================================================
+
+        // ONYX JSXGraph Snippet - U-Profil Vereinfacht V7 (Fix f&uuml;r Pfeil-Labels)
+
+        try {
+            var container = document.getElementById('JSX_CONTAINER_ID');
+            if (container) {
+                container.style.height = '550px';
+                container.style.width = '600px';
+                container.style.border = '3px solid darkcyan'; // Farbe zur Unterscheidung
+            } else {
+                throw new Error("JSX_CONTAINER_ID nicht gefunden.");
+            }
+
+            let brd = JXG.JSXGraph.initBoard('JSX_CONTAINER_ID', {
+                boundingbox: [-3, 5, 4, -5],
+                axis: true,
+                defaultAxes: {
+                    x: { name: '', withLabel: false, label: { visible: false } },
+                    y: { name: '', withLabel: false, label: { visible: false } }
+                },
+                showCopyright: false,
+                showNavigation: true
+            });
+
+            // --- Profil-Parameter ---
+            let H_profil = 7.0;
+            let B_flansch = 2.5;
+            let t_steg = 0.4;
+            let t_flansch = 0.6;
+
+            // --- Profil zeichnen ---
+            let p_coords = [
+                [0, H_profil / 2], [t_steg + B_flansch, H_profil / 2], [t_steg + B_flansch, H_profil / 2 - t_flansch],
+                [t_steg, H_profil / 2 - t_flansch], [t_steg, -(H_profil / 2 - t_flansch)],
+                [t_steg + B_flansch, -(H_profil / 2 - t_flansch)], [t_steg + B_flansch, -H_profil / 2], [0, -H_profil / 2]
+            ];
+
+            brd.create('polygon', p_coords, {
+                name: '',
+                fillColor: '#DDDDDD',
+                fillOpacity: 0.9,
+                borders: {
+                    strokeColor: 'black',
+                    strokeWidth: 2,
+                    fixed: true
+                },
+                fixed: true,
+                vertices: { visible: false }
+            });
+
+            // --- Kr&auml;fte-Betr&auml;ge ---
+            let F1_betrag = 30;
+            let F2_betrag = 100;
+            let F3_betrag = 30;
+
+            // --- Definitionen f&uuml;r Kraft-Angriffspunkte und Hebelarme ---
+            let x_f1_start = t_steg;
+            let x_f1_ende = t_steg + B_flansch * 0.8;
+            let y_f1_wirklinie = H_profil / 2 - t_flansch / 2;
+            let x_f2_wirklinie = t_steg / 2;
+            let y_f2_start = -H_profil / 2 * 0.5;
+            let y_f2_ende = H_profil / 2 * 0.5;
+            let x_f3_start = t_steg + B_flansch * 0.8;
+            let x_f3_ende = t_steg;
+            let y_f3_wirklinie = -(H_profil / 2 - t_flansch / 2);
+
+            // --- Verschiebbarer Punkt T ---
+            let T_punkt = brd.create('glider', [-0.5, 0, brd.defaultAxes.x], {
+                name: 'T', color: 'red', size: 5,
+                label: { fontSize: 14, offset: [-10, 15], color: 'red' }
+            });
+            brd.create('text', [() => T_punkt.X() + 0.1, -0.4, () => `T=(${T_punkt.X().toFixed(3)}, 0)`], {
+                fontSize: 12, color: 'red', parse: false, fixed: true
+            });
+
+            // --- Kr&auml;fte visualisieren ---
+            let kraftLabelBasisOffsetFt13 = [-5, 10]; // Angepasster Offset
+            let kraftLabelBasisOffsetFt2 = [-25, 0];
+            let kraftLabelFontSize = 13;
+            let pfeilSpitzenGroesse = 5;
+
+            // Pfeil Ft1
+            let farbeFt1 = 'blue';
+            brd.create('arrow', [[x_f1_start, y_f1_wirklinie], [x_f1_ende, y_f1_wirklinie]], {
+                name: 'Ft1',
+                withLabel: true, // Explizit setzen
+                strokeColor: farbeFt1,
+                strokeWidth: 2,
+                lastArrow: { // Eigenschaften der Pfeilspitze
+                    type: 1, size: pfeilSpitzenGroesse, fillColor: farbeFt1
+                },
+                label: {
+                    offset: kraftLabelBasisOffsetFt13, // Offset anpassen
+                    color: farbeFt1,
+                    fontSize: kraftLabelFontSize,
+                    autoPosition: false // Verhindert automatische Neupositionierung
+                },
+                fixed: true
+            });
+
+            // Pfeil Ft2
+            let farbeFt2 = 'green';
+            brd.create('arrow', [[x_f2_wirklinie, y_f2_start], [x_f2_wirklinie, y_f2_ende]], {
+                name: 'Ft2',
+                withLabel: true, // Explizit setzen
+                strokeColor: farbeFt2,
+                strokeWidth: 2,
+                lastArrow: { type: 1, size: pfeilSpitzenGroesse, fillColor: farbeFt2 },
+                label: {
+                    offset: kraftLabelBasisOffsetFt2, // Offset anpassen
+                    color: farbeFt2,
+                    fontSize: kraftLabelFontSize,
+                    autoPosition: false
+                },
+                fixed: true
+            });
+
+            // Pfeil Ft3
+            let farbeFt3 = 'purple';
+            brd.create('arrow', [[x_f3_start, y_f3_wirklinie], [x_f3_ende, y_f3_wirklinie]], {
+                name: 'Ft3',
+                withLabel: true, // Explizit setzen
+                strokeColor: farbeFt3,
+                strokeWidth: 2,
+                lastArrow: { type: 1, size: pfeilSpitzenGroesse, fillColor: farbeFt3 },
+                label: {
+                    offset: [kraftLabelBasisOffsetFt13[0], kraftLabelBasisOffsetFt13[1] * -1.5], // Offset anpassen (nach unten)
+                    color: farbeFt3,
+                    fontSize: kraftLabelFontSize,
+                    autoPosition: false
+                },
+                fixed: true
+            });
+
+            // --- Dynamische Momentenberechnung ---
+            let M1_T_func = () => -F1_betrag * y_f1_wirklinie;
+            let M2_T_func = () => F2_betrag * (x_f2_wirklinie - T_punkt.X());
+            let M3_T_func = () => F3_betrag * y_f3_wirklinie;
+
+            // --- Textanzeige f&uuml;r Momente ---
+            let text_y_pos = -2.6;
+            let momentFontSize = 13;
+
+            brd.create('text', [-2.9, text_y_pos, () => `M(Ft1) um T = ${M1_T_func().toFixed(1)} N&middot;m`],
+                { parse: false, fontSize: momentFontSize, color: farbeFt1, fixed: true });
+            brd.create('text', [-2.9, text_y_pos - 0.35, () => `M(Ft2) um T = ${M2_T_func().toFixed(1)} N&middot;m`],
+                { parse: false, fontSize: momentFontSize, color: farbeFt2, fixed: true });
+            brd.create('text', [-2.9, text_y_pos - 0.7, () => `M(Ft3) um T = ${M3_T_func().toFixed(1)} N&middot;m`],
+                { parse: false, fontSize: momentFontSize, color: farbeFt3, fixed: true });
+
+            brd.create('text', [-2.9, text_y_pos - 1.15, () => {
+                let m_sum = M1_T_func() + M2_T_func() + M3_T_func();
+                let textFarbe = (Math.abs(m_sum) < 0.1) ? '#006400' : 'black';
+                return `<span style="font-weight:bold; color:${textFarbe}; font-size: ${momentFontSize + 1}px;">Summe M um T = ${m_sum.toFixed(1)} N&middot;m</span>`;
+            }], { parse: false, fixed: true });
+
+            brd.update();
+
+        } catch (e) {
+            // Stille Fehlerbehandlung
+        }
+
+        // =====================================================================
+        // === ENDE ONYX-CODE ================================================
+        // =====================================================================
+    </script>
+</body>
+
+</html>

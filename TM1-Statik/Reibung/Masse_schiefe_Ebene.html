@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="de">
+
+<head>
+    <meta charset="UTF-8" />
+    <title>MecLib / JSXGraph Aufgabe</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <!-- JSXGraph CSS -->
+    <link rel="stylesheet" href="https://jsxgraph.org/distrib/jsxgraph.css" />
+
+    <!-- JSXGraph JS -->
+    <script src="https://jsxgraph.org/distrib/jsxgraphcore.js"></script>
+
+    <!-- Deine MecLib-/ONYX-Erweiterung aus GitHub -->
+    <script src="https://cdn.jsdelivr.net/gh/Fkaule/TM_JSX_Graph@main/MecLibONYX.js"></script>
+
+    <style>
+        body {
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            margin: 1rem;
+        }
+
+        h1 {
+            font-size: 1.4rem;
+            margin-bottom: 0.5rem;
+        }
+
+        #JSX_CONTAINER_ID {
+            width: 700px;
+            height: 260px;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Interaktive MecLib-Aufgabe</h1>
+
+    <!-- Container für das Board -->
+    <div id="JSX_CONTAINER_ID" class="jxgbox"></div>
+
+    <script>
+        // =====================================================================
+        // === ONYX-CODE HIER EINFÜGEN =========================================
+        // =====================================================================
+
+        document.getElementById('JSX_CONTAINER_ID').style.height = '500px';                                    // adjust height
+        JXG.Options.text.useMathJax = true;
+        let xmin = -2, xmax = 10, ymin = -2, ymax = 8;
+        let length_FG = 2
+        let brd = JXG.JSXGraph.initBoard('JSX_CONTAINER_ID', { axis: false, boundingbox: [xmin, ymax, xmax, ymin], useMathJax: true });
+
+        // Slider for the angle of the slope
+        let angle = brd.create('slider', [[0.2, ymax - 1], [8, ymax - 1], [0, 30, 75]], {
+            snapWidth: 5,
+            strokeColor: 'blue',
+            fillColor: 'lightblue',
+            precision: 0,
+            label: {
+                strokeColor: 'blue',
+                fontSize: 25
+            }
+        });
+
+        var angle_label = brd.create('text', [-1.2, ymax - 1, "\\( \\alpha(^\\circ)\\)"], { fontSize: 25, color: 'blue' });
+
+
+        // Slider for the friction coefficient
+        let mu = brd.create('slider', [[0.2, ymax - 2], [8, ymax - 2], [0, 0.3, 0.6]], {
+            snapWidth: 0.05,
+            strokeColor: 'green',
+            fillColor: 'lightgreen',
+            label: {
+                strokeColor: 'green',
+                fontSize: 25
+            }
+        });
+
+        var muslider_label = brd.create('text', [-0.5, ymax - 2, "\\(\\mu\\)"], { fontSize: 25, color: 'green' });
+
+        // Slider for applied force
+        let force = brd.create('slider', [[0.2, ymax - 3], [8, ymax - 3], [0, 0.5, 1]], {
+            snapWidth: 0.05,
+            strokeColor: 'red',
+            fillColor: 'lightcoral',
+            label: {
+                strokeColor: 'red',
+                fontSize: 25
+            }
+        });
+
+        var forceslider_label = brd.create('text', [-1.8, ymax - 3, "\\({F}/{F_G}\\)"], { fontSize: 25, color: 'red' });
+
+
+        // Calculate friction cone angle
+        function frictionAngle(muValue) {
+            return Math.atan(muValue);
+        }
+
+        // Points defining the slope
+        let pointA = [0, 0];
+        let pointB = function () {
+            return [
+                Math.cos(angle.Value() * Math.PI / 180) * 8,
+                Math.sin(angle.Value() * Math.PI / 180) * 8
+            ];
+        };
+
+        let pointLeft = function () {
+            return [
+                xmin,
+                Math.tan(angle.Value() * Math.PI / 180) * xmin
+            ];
+        };
+
+        let pointRight = function () {
+            return [
+                xmax,
+                Math.tan(angle.Value() * Math.PI / 180) * xmax
+            ];
+        };
+
+        let pointRightbottom = [xmax, ymin];
+        let pointLeftbottom = [xmin, ymin];
+
+        // Draw the slope
+        brd.create('line', [pointA, pointB], {
+            strokeWidth: 2,
+            strokeColor: 'black'
+        });
+
+        // Draw the shaded area below the slope
+        let slopeShade = brd.create('polygon', [
+            pointLeft,
+            pointRight,
+            pointRightbottom,
+            pointLeftbottom
+        ], {
+            fillColor: 'gray',
+            fillOpacity: 0.2,
+            borders: {
+                strokeColor: 'gray',
+                highlight: false
+            },
+            vertices: { visible: false }
+        });
+
+        // Block on the slope
+        let block = brd.create('point', [
+            function () { return pointB()[0] / 2; },
+            function () { return pointB()[1] / 2; }
+        ], {
+            name: '',
+            fixed: true,
+            size: 4,
+            face: 'square',
+            fillColor: 'brown'
+        });
+
+        // Friction cone
+        let frictionLine1 = brd.create('line', [block, [
+            function () {
+                return block.X() + Math.sin(angle.Value() * Math.PI / 180 + frictionAngle(mu.Value()));
+            },
+            function () {
+                return block.Y() - Math.cos(angle.Value() * Math.PI / 180 + frictionAngle(mu.Value()));
+            }
+        ]], {
+            strokeColor: 'green',
+            dash: 1
+        });
+
+        let frictionLine2 = brd.create('line', [block, [
+            function () {
+                return block.X() + Math.sin(angle.Value() * Math.PI / 180 - frictionAngle(mu.Value()));
+            },
+            function () {
+                return block.Y() - Math.cos(angle.Value() * Math.PI / 180 - frictionAngle(mu.Value()));
+            }
+        ]], {
+            strokeColor: 'green',
+            dash: 1
+        });
+
+
+        // vector F_G
+        let weight = brd.create('arrow', [block, [
+            function () { return block.X(); },
+            function () { return block.Y() - length_FG; }
+        ]], {
+            strokeColor: 'purple',
+            strokeWidth: 2,
+            withLabel: true,
+            name: '\\(\\vec{F_G}\\)',
+            label: {
+                strokeColor: 'purple', // Textfarbe
+                fontSize: 25,        // Optional: Schriftgr&ouml;&szlig;e
+                offset: [-15, -20]
+            }
+        });
+
+        // Vector F
+        let resultant = brd.create('arrow', [block, [
+            function () {
+                return block.X() + (force.Value() * length_FG * Math.cos(angle.Value() * Math.PI / 180));
+            },
+            function () {
+                return block.Y() + (force.Value() * length_FG * Math.sin(angle.Value() * Math.PI / 180));
+            }
+        ]], {
+            strokeColor: 'black',
+            strokeWidth: 2,
+            withLabel: true,
+            name: '\\(\\vec{F}\\)',
+            label: {
+                strokeColor: 'black', // Textfarbe
+                fontSize: 25,        // Optional: Schriftgr&ouml;&szlig;e
+                offset: [-10, 25]
+            }
+        });
+
+        // Resultierender Kraftvektor F+F_G
+        let appliedForce = brd.create('arrow', [block, [
+            function () {
+                return block.X() + (force.Value() * length_FG * Math.cos(angle.Value() * Math.PI / 180));
+            },
+            function () {
+                return block.Y() + (force.Value() * length_FG * Math.sin(angle.Value() * Math.PI / 180)) - length_FG;
+            }
+        ]], {
+            strokeColor: 'red',
+            strokeWidth: 2,
+            withLabel: true,
+            name: '\\(\\vec{F_G}+\\vec{F}\\)',
+            label: {
+                strokeColor: 'red', // Textfarbe
+                fontSize: 25,        // Optional: Schriftgr&ouml;&szlig;e
+                offset: [0, -20]
+            }
+        });
+
+        let alphaAngle = brd.create('angle', [
+            [xmax, 0],
+            [0, 0],
+            pointRight
+        ], {
+            name: '\\(\\alpha\\)', // MathJax-Beschriftung
+            radius: 1,
+            withLabel: true,
+            strokeColor: 'blue', // Farbe des Winkelbogens
+            fillColor: 'lightblue', // Farbe der Fl&auml;che im Winkel
+            fillOpacity: 0.5, // Transparenz der Fl&auml;che (0 = durchsichtig, 1 = undurchsichtig)
+            label: {
+                strokeColor: 'blue', // Farbe der Beschriftung
+                fontSize: 25,         // Optional: Schriftgr&ouml;&szlig;e
+                offset: [0, 0]
+            },
+            vertices: {
+                fixed: true,     // Punkte nicht verschiebbar machen
+                visible: false
+            }
+        });
+
+        // Draw the shaded area below the cone
+        let coneShade = brd.create('polygon', [
+            [function () { return block.X() }, function () { return block.Y() }],
+            [function () {
+                return block.X() + 100 * Math.sin(angle.Value() * Math.PI / 180 + frictionAngle(mu.Value()))
+            }, function () {
+                return block.Y() - 100 * Math.cos(angle.Value() * Math.PI / 180 + frictionAngle(mu.Value()))
+            }],
+            [function () {
+                return block.X() + 100 * Math.sin(angle.Value() * Math.PI / 180 - frictionAngle(mu.Value()))
+            },
+            function () {
+                return block.Y() - 100 * Math.cos(angle.Value() * Math.PI / 180 - frictionAngle(mu.Value()))
+            }]
+        ], {
+            fillColor: 'lightgreen',
+            fillOpacity: 0.2,
+            borders: {
+                strokeColor: 'gray',
+                highlight: false
+            },
+            vertices: { visible: false }
+        });
+
+
+
+        brd.update();
+
+        // =====================================================================
+        // === ENDE ONYX-CODE ================================================
+        // =====================================================================
+    </script>
+</body>
+
+</html>

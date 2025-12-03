@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="de">
+
+<head>
+    <meta charset="UTF-8" />
+    <title>MecLib / JSXGraph Aufgabe</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <!-- JSXGraph CSS -->
+    <link rel="stylesheet" href="https://jsxgraph.org/distrib/jsxgraph.css" />
+
+    <!-- JSXGraph JS -->
+    <script src="https://jsxgraph.org/distrib/jsxgraphcore.js"></script>
+
+    <!-- Deine MecLib-/ONYX-Erweiterung aus GitHub -->
+    <script src="https://cdn.jsdelivr.net/gh/Fkaule/TM_JSX_Graph@main/MecLibONYX.js"></script>
+
+    <style>
+        body {
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            margin: 1rem;
+        }
+
+        h1 {
+            font-size: 1.4rem;
+            margin-bottom: 0.5rem;
+        }
+
+        #JSX_CONTAINER_ID {
+            width: 700px;
+            height: 260px;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Interaktive MecLib-Aufgabe</h1>
+
+    <!-- Container für das Board -->
+    <div id="JSX_CONTAINER_ID" class="jxgbox"></div>
+
+    <script>
+        // =====================================================================
+        // === ONYX-CODE HIER EINFÜGEN =========================================
+        // =====================================================================
+
+        (() => {
+            const CID = 'JSX_CONTAINER_ID';
+
+            // vorhandenes Board freigeben (ONYX/JSXGraph Mehrfach-Init absichern)
+            try {
+                if (window.JXG && JXG.JSXGraph && JXG.JSXGraph.boards) {
+                    for (const k in JXG.JSXGraph.boards) {
+                        const b = JXG.JSXGraph.boards[k];
+                        if (b && b.container && b.container.id === CID) JXG.JSXGraph.freeBoard(b);
+                    }
+                }
+            } catch (e) { }
+
+            const host = document.getElementById(CID);
+            if (!host) return;
+            host.style.border = "none";
+            host.style.width = "800px";
+            host.style.height = "440px";
+
+            // ---------------- Grundparameter ----------------
+            const R = 1.2;                                     // Kreisradius
+            const bbox = { left: -2, top: 5.2, right: 11, bottom: -1.6 };
+
+            // Sichtbarer Rand, damit die Scheibe links/rechts komplett im Bild bleibt
+            const pad = 0.2;
+            const Xleft = bbox.left + R + pad;               // linke Zentrumslage (voll sichtbar)
+            const Xright = bbox.right - R - pad;               // rechte Zentrumslage (voll sichtbar)
+
+            // xC = X0 + R*&theta; ; wir starten "ganz links" mit &theta; = &theta;_min = 0
+            const X0 = Xleft;
+            const thMin = 0;
+            const thMax = Math.max(0, (Xright - Xleft) / R);
+
+            // *** EINSTELLUNG: Gleichm&auml;&szlig;iger Abstand der Punkte auf beiden Bahnen ***
+            const DELTA_S = 0.40;                              // <-- HIER den Punktabstand einstellen (in "x"-L&auml;nge)
+            const DTH = DELTA_S / R;                           // zugeh&ouml;riger Winkelabstand
+
+            // Board (Standard-KS: x nach rechts, y nach oben)
+            const brd = JXG.JSXGraph.initBoard(CID, {
+                boundingbox: [bbox.left, bbox.top, bbox.right, bbox.bottom],
+                axis: false, keepaspectratio: false, showNavigation: false, showCopyright: false
+            });
+
+            // Farben/Styles
+            const col = {
+                ground: '#777',
+                groundFill: '#f0f0f0',
+                diskEdge: '#2b4c7e', diskFill: '#a8d4ff',
+                rast: '#00796b',      // Rastpolbahn (fest)
+                gang: '#d33',         // Gangpolbahn (bewegtes KS)
+                axes: '#333'
+            };
+
+            // Hilfsfunktionen: Rollbedingung (Zentrum) & Orientierung
+            const xC = (th) => X0 + R * th;
+            const psi = () => -thSlider.Value();   // CCW-&theta; => CW-Orientierung &psi;=-&theta; f&uuml;r Rollen nach rechts
+
+            // Bodenlinie + F&uuml;llung darunter
+            brd.create('line', [[bbox.left, 0], [bbox.right, 0]],
+                { straightFirst: false, straightLast: false, strokeColor: col.ground, strokeWidth: 2 });
+            brd.create('polygon',
+                [[bbox.left, 0], [bbox.right, 0], [bbox.right, bbox.bottom], [bbox.left, bbox.bottom]],
+                { fillColor: col.groundFill, fillOpacity: 0.7, borders: { visible: false }, fixed: true, layer: 0 }
+            );
+
+            // Slider &theta; (Start ganz links)
+            const thSlider = brd.create('slider',
+                [[bbox.left + 0.6, bbox.top - 0.8], [bbox.right - 0.6, bbox.top - 0.8], [thMin, thMin, thMax]],
+                { withLabel: true, name: '&theta;', snapWidth: (Math.PI / 90) }
+            );
+
+            // Scheibe/Kugel (2D-Schnitt)
+            const C = brd.create('point', [() => xC(thSlider.Value()), () => R], { visible: false, fixed: true });
+            const Ptop = brd.create('point', [() => C.X(), () => C.Y() + R], { visible: false, fixed: true });
+            brd.create('circle', [C, Ptop], { strokeColor: col.diskEdge, fillColor: col.diskFill, fillOpacity: 0.15, strokeWidth: 2 });
+
+            // mitdrehendes KS am Mittelpunkt (&psi;=-&theta;)
+            const axLen = 0.9;
+            brd.create('arrow',
+                [C, () => [C.X() + axLen * Math.cos(psi()), C.Y() + axLen * Math.sin(psi())]],
+                { strokeColor: col.axes, strokeWidth: 2 });
+            brd.create('arrow',
+                [C, () => [C.X() - axLen * Math.sin(psi()), C.Y() + axLen * Math.cos(psi())]],
+                { strokeColor: col.axes, strokeWidth: 2, dash: 2 });
+            brd.create('text', [() => C.X() + axLen * Math.cos(psi()) + 0.2,
+            () => C.Y() + axLen * Math.sin(psi()),
+                "<span style='font-family:serif;font-style:italic'>x'</span>"],
+                { display: 'html', fixed: true });
+            brd.create('text', [() => C.X() - axLen * Math.sin(psi()) + 0.2,
+            () => C.Y() + axLen * Math.cos(psi()),
+                "<span style='font-family:serif;font-style:italic'>y'</span>"],
+                { display: 'html', fixed: true });
+
+            // Aktueller Kontaktpunkt (Rast) auf der Ebene
+            brd.create('point',
+                [() => xC(thSlider.Value()), 0],
+                { name: '', face: 'o', size: 4, strokeColor: '#000', fillColor: '#000', fixed: true, highlight: false });
+
+            // &Uuml;berschriften
+            brd.create('text', [bbox.left + 0.2, bbox.top - 1.5,
+                "<b>Rastpolbahn</b> (festes System)"],
+                { display: 'html', fixed: true, strokeColor: col.rast });
+            brd.create('text', [bbox.left + 0.2, bbox.top - 1.8,
+                "<b>Gangpolbahn</b> (bewegtes System)"],
+                { display: 'html', fixed: true, strokeColor: col.gang });
+
+            // ---------------- Gleichm&auml;&szlig;iges Sampling ----------------
+            const rastPoints = [];
+            const gangPoints = [];
+            const madeIndex = new Set();               // welche Indizes k wurden schon erzeugt?
+            const xRef = xC(thMin);                    // Referenz f&uuml;r Index 0 (ganz links)
+
+            // Erzeuge Sample f&uuml;r Index k (einheitlicher Abstand)
+            function createSampleAtIndex(k) {
+                if (madeIndex.has(k)) return;
+                const theta_k = thMin + k * DTH;         // zugeh&ouml;riger Winkel
+                const px = xC(theta_k);
+
+                // Rastpolpunkt (fest)
+                const pR = brd.create('point', [px, 0], {
+                    name: '', size: 2, face: 'o', strokeColor: col.rast, fillColor: col.rast, fixed: true, highlight: false
+                });
+                rastPoints.push(pR);
+
+                // Gangpolpunkt (bewegtes KS):
+                // Weltwinkel jetzt: alpha = psi() + theta_k - &pi;/2
+                const pG = brd.create('point',
+                    [
+                        () => C.X() + R * Math.cos(psi() + theta_k - Math.PI / 2),
+                        () => C.Y() + R * Math.sin(psi() + theta_k - Math.PI / 2)
+                    ],
+                    { name: '', size: 2, face: 'o', strokeColor: col.gang, fillColor: col.gang, fixed: true, highlight: false }
+                );
+                gangPoints.push(pG);
+
+                madeIndex.add(k);
+            }
+
+            // F&uuml;lle alle noch fehlenden Samples bis zum aktuellen Sliderstand
+            function ensureSamplesUpToTheta(thetaNow) {
+                // Index basierend auf konstantem Bodenabstand &Delta;s
+                const xNow = xC(thetaNow);
+                let kNow = Math.floor((xNow - xRef) / DELTA_S + 1e-9);  // 0,1,2,...
+                if (kNow < 0) kNow = 0;
+
+                // fehlende Indizes anlegen
+                for (let k = 0; k <= kNow; k++) {
+                    createSampleAtIndex(k);
+                }
+            }
+
+            // Slider-Handler (unabh&auml;ngig von Ziehgeschwindigkeit)
+            function onSlide() {
+                ensureSamplesUpToTheta(thSlider.Value());
+            }
+
+            // Reset-Button
+            brd.create('button', [bbox.left + 0.2, bbox.bottom + 0.4, 'Reset Bahnen', () => {
+                // Punkte entfernen
+                rastPoints.splice(0).forEach(p => brd.removeObject(p));
+                gangPoints.splice(0).forEach(p => brd.removeObject(p));
+                madeIndex.clear();
+
+                // Slider ganz links
+                thSlider.setValue(thMin);
+
+                // Startpunkt (Index 0) erzeugen
+                ensureSamplesUpToTheta(thSlider.Value());
+                brd.update();
+            }]);
+
+            // Startzustand: ganz links beginnen, Samples erzeugen
+            thSlider.setValue(thMin);
+            ensureSamplesUpToTheta(thSlider.Value());
+
+            // Beim Ziehen automatisch fehlende Punkte mit konstantem Abstand erg&auml;nzen
+            thSlider.on('drag', onSlide);
+            thSlider.on('up', onSlide);
+        })();
+
+        // =====================================================================
+        // === ENDE ONYX-CODE ================================================
+        // =====================================================================
+    </script>
+</body>
+
+</html>

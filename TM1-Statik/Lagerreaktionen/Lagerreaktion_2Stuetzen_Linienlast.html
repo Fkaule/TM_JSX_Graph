@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="de">
+
+<head>
+    <meta charset="UTF-8" />
+    <title>MecLib / JSXGraph Aufgabe</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <!-- JSXGraph CSS -->
+    <link rel="stylesheet" href="https://jsxgraph.org/distrib/jsxgraph.css" />
+
+    <!-- JSXGraph JS -->
+    <script src="https://jsxgraph.org/distrib/jsxgraphcore.js"></script>
+
+    <!-- Deine MecLib-/ONYX-Erweiterung aus GitHub -->
+    <script src="https://cdn.jsdelivr.net/gh/Fkaule/TM_JSX_Graph@main/MecLibONYX.js"></script>
+
+    <style>
+        body {
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            margin: 1rem;
+        }
+
+        h1 {
+            font-size: 1.4rem;
+            margin-bottom: 0.5rem;
+        }
+
+        #JSX_CONTAINER_ID {
+            width: 700px;
+            height: 260px;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Interaktive MecLib-Aufgabe</h1>
+
+    <!-- Container für das Board -->
+    <div id="JSX_CONTAINER_ID" class="jxgbox"></div>
+
+    <script>
+        // =====================================================================
+        // === ONYX-CODE HIER EINFÜGEN =========================================
+        // =====================================================================
+
+        document.getElementById('JSX_CONTAINER_ID').style.border = "none";
+        JXG.Options.grid.majorStep = 0;
+
+        window.L = 5;
+        window.q0 = 1;
+        window.force_arrow_display_length_factor = 0.7;
+
+        const brd1 = initMecLib('JSX_CONTAINER_ID');
+        brd1.setBoundingBox([-1, 4, window.L + 1, -3], true);
+
+        const content = [
+            ["grid", "", "", -1, window.L + 1, -4, 5, 40],
+            // Wichtig: F_res NACH den Lagerkr&auml;ften einf&uuml;gen, damit die Indizes (objects[1], objects[2]) g&uuml;ltig bleiben
+            ["force", "F_A", [0, -0.2], [0, -1.2], -0.5],
+            ["force", "F_B", [window.L, -0.2], [window.L, -1.2], -0.5],
+            // NEU: Platzhalter f&uuml;r die resultierende Kraft
+            ["force", "F_{res}", [window.L / 2, 1.2], [window.L / 2, 0.2], 0.5],
+            ["beam", "", [0, 0], [window.L, 0], 0.1],
+            ["fix12", "A", [0, 0], 0],
+            ["fix1", "B", [window.L, 0], 0],
+        ];
+
+        const continueCode = () => {
+            const L = window.L;
+            const q_max = window.q0;
+            const kVis = window.force_arrow_display_length_factor;
+            const yHeadReactions = -1; // Y-Position f&uuml;r die Pfeilspitzen der Reaktionen
+            const yTailResultant = 0;  // Y-Position f&uuml;r den Pfeilfu&szlig; der Resultierenden
+
+            const shapeSlider = board.create('slider',
+                [[-0.5, 4], [L + 0.5, 4], [-1, 0, 1]],
+                { fixed: false, snapWidth: 1 / 3, label: { visible: false } }
+            );
+            if (shapeSlider.point) shapeSlider.point.setAttribute({ fixed: false });
+
+            let currentQObj = null;
+            let currentQTexts = [];
+            const rA = objects[1];
+            const rB = objects[2];
+            // NEU: Referenz auf das F_res Objekt
+            const resForce = objects[3];
+            // Die Punkte des F_res-Pfeils beweglich machen
+            resForce.p1.setAttribute({ fixed: false });
+            resForce.p2.setAttribute({ fixed: false });
+
+            const yPos = -2.2;
+            const labelColorReactions = '#0000ff'; // Blau f&uuml;r Reaktionen
+            const labelColorResultant = '#0000ff'; // Rot f&uuml;r Resultierende
+
+            board.create('text', [0.2, yPos, toTEX('F_A =')], { anchorX: 'left', fixed: true, color: labelColorReactions });
+            const wertAnzeigeA = board.create('text', [1.1, yPos, ''], { anchorX: 'left', fixed: true, useMathJax: false, color: labelColorReactions });
+            board.create('text', [L - 1.9, yPos, toTEX('F_B =')], { anchorX: 'left', fixed: true, color: labelColorReactions });
+            const wertAnzeigeB = board.create('text', [L - 1.0, yPos, ''], { anchorX: 'left', fixed: true, useMathJax: false, color: labelColorReactions });
+
+            const yPosRes = 1.8;
+            board.create('text', [0.2, yPosRes, toTEX('F_{res} =')], { anchorX: 'left', fixed: true, color: labelColorResultant });
+            const wertAnzeigeRes = board.create('text', [1.3, yPosRes, ''], { anchorX: 'left', fixed: true, useMathJax: false, color: labelColorResultant });
+
+            function makeQ(q1, q2) {
+                if (currentQObj) board.removeObject(currentQObj.obj, true);
+                for (const t of currentQTexts) { try { board.removeObject(t); } catch (_) { } }
+                currentQTexts = [];
+                board.suspendUpdate();
+                const n0 = board.objectsList.length;
+                const data = ["q", "", "", [0, 0], [L, 0], q1, q2, 0];
+                currentQObj = new q(data);
+                const list = board.objectsList;
+                for (let i = n0; i < list.length; i++) {
+                    const o = list[i];
+                    if (o && o.elType === 'text') {
+                        o.setAttribute({ visible: false });
+                        currentQTexts.push(o);
+                    }
+                }
+                board.unsuspendUpdate(); board.update();
+            }
+
+            function setReactions(q1, q2) {
+                // Lagerreaktionen berechnen
+                const FA = L * (2 * q1 + q2) / 6;
+                const FB = L * (q1 + 2 * q2) / 6;
+
+                const F_res = (q1 + q2) * L / 2;
+                const xs = F_res === 0 ? L / 2 : (L / 3) * (q1 + 2 * q2) / (q1 + q2);
+
+                // Anzeigen aktualisieren
+                wertAnzeigeA.setText(FA.toFixed(2) + ' N');
+                wertAnzeigeB.setText(FB.toFixed(2) + ' N');
+                wertAnzeigeRes.setText(F_res.toFixed(2) + ' N');
+
+                // Pfeill&auml;ngen berechnen
+                const la = (FA / q_max) * kVis;
+                const lb = (FB / q_max) * kVis;
+                const l_res = (F_res / q_max) * kVis;
+
+                // Pfeile bewegen und skalieren
+                rA.p2.moveTo([0, yHeadReactions], 0); rA.p1.moveTo([0, yHeadReactions - la], 0);
+                rB.p2.moveTo([L, yHeadReactions], 0); rB.p1.moveTo([L, yHeadReactions - lb], 0);
+                resForce.p2.moveTo([xs, yTailResultant], 0); resForce.p1.moveTo([xs, yTailResultant + l_res], 0);
+            }
+
+            const shapeToQ12 = (s) => s >= 0 ? [q_max * (1 - s), q_max] : [q_max, q_max * (1 + s)];
+
+            let raf = 0;
+            const schedule = () => {
+                if (raf) return;
+                raf = requestAnimationFrame(() => {
+                    raf = 0;
+                    const s = shapeSlider.Value();
+                    const [q1, q2] = shapeToQ12(s);
+                    makeQ(q1, q2);
+                    setReactions(q1, q2);
+                });
+            };
+
+            shapeSlider.on('drag', schedule);
+
+            // Initial
+            const [q1, q2] = shapeToQ12(shapeSlider.Value());
+            makeQ(q1, q2);
+            setReactions(q1, q2);
+        };
+
+        runMecLib(brd1, content, continueCode);
+
+        // =====================================================================
+        // === ENDE ONYX-CODE ================================================
+        // =====================================================================
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="de">
+
+<head>
+    <meta charset="UTF-8" />
+    <title>MecLib / JSXGraph Aufgabe</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <!-- JSXGraph CSS -->
+    <link rel="stylesheet" href="https://jsxgraph.org/distrib/jsxgraph.css" />
+
+    <!-- JSXGraph JS -->
+    <script src="https://jsxgraph.org/distrib/jsxgraphcore.js"></script>
+
+    <!-- Deine MecLib-/ONYX-Erweiterung aus GitHub -->
+    <script src="https://cdn.jsdelivr.net/gh/Fkaule/TM_JSX_Graph@main/MecLibONYX.js"></script>
+
+    <style>
+        body {
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            margin: 1rem;
+        }
+
+        h1 {
+            font-size: 1.4rem;
+            margin-bottom: 0.5rem;
+        }
+
+        #JSX_CONTAINER_ID {
+            width: 700px;
+            height: 260px;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Interaktive MecLib-Aufgabe</h1>
+
+    <!-- Container für das Board -->
+    <div id="JSX_CONTAINER_ID" class="jxgbox"></div>
+
+    <script>
+        // =====================================================================
+        // === ONYX-CODE HIER EINFÜGEN =========================================
+        // =====================================================================
+
+        // Board initialisieren
+        const board = JXG.JSXGraph.initBoard('JSX_CONTAINER_ID', {
+            boundingbox: [-1, 6, 9, -2],
+            axis: true,
+            grid: true,
+            keepaspectratio: true
+        });
+
+        // 1. Kurve und Ableitungen
+        const f = (t) => 0.1 * Math.pow(t, 3) - 0.9 * Math.pow(t, 2) + 1.8 * t + 1;
+        const df = (t) => 0.3 * Math.pow(t, 2) - 1.8 * t + 1.8;
+        const ddf = (t) => 0.6 * t - 1.8;
+        const curve = board.create('functiongraph', [f, 0, 8], { strokeWidth: 2.5, strokeColor: '#32CD32' });
+
+        // 2. Slider
+        const slider = board.create('slider', [[1, 5], [7, 5], [0.5, 2.5, 7.5]], { name: 't', snapWidth: 0.01, fixed: false });
+
+        // 3. Punkt P
+        const p = board.create('glider', [() => slider.Value(), () => f(slider.Value()), curve], { name: 'P', size: 4, color: 'blue', label: { autoPosition: true } });
+
+        // 4. Geometrische Objekte
+        const K = board.create('point', [0, 0], { name: 'K', size: 2, color: 'red', label: { autoPosition: true } });
+        const osculatingCircle = board.create('circle', [K, p], { strokeColor: 'gray', strokeWidth: 1, dash: 2 });
+
+        // ---- &Auml;NDERUNG: Label f&uuml;r die Radius-Linie hinzuf&uuml;gen ----
+        const radiusLine = board.create('segment', [K, p], {
+            strokeColor: 'gray',
+            strokeWidth: 1,
+            dash: 2,
+            withLabel: true, // Hauptschalter, um das Label zu aktivieren
+            name: '\\(\\rho\\)', // Der Text des Labels
+            label: {
+                color: 'gray', // Farbe des Labels
+                autoPosition: true,
+                offset: [10, 0] // kleiner Abstand zur Linie
+            }
+        });
+        // -------------------------------------------------------------
+
+        // Entkoppelte Labels f&uuml;r die Vektoren
+        const et_vec = board.create('arrow', [p, () => {
+            const t = slider.Value();
+            const dxt = 1, dyt = df(t);
+            const mag = Math.sqrt(dxt * dxt + dyt * dyt);
+            return [p.X() + dxt / mag, p.Y() + dyt / mag];
+        }], { color: 'red' });
+        const et_label = board.create('text', [() => et_vec.point2.X(), () => et_vec.point2.Y(), '\\(\\vec{e}_t\\)'], {
+            color: 'red', offset: [8, 8], useMathJax: true
+        });
+        const en_vec = board.create('arrow', [p, () => {
+            const dist = p.Dist(K);
+            if (dist < 1e-6) return [p.X(), p.Y()];
+            return [p.X() + (K.X() - p.X()) / dist, p.Y() + (K.Y() - p.Y()) / dist];
+        }], { color: 'red' });
+        const en_label = board.create('text', [() => en_vec.point2.X(), () => en_vec.point2.Y(), '\\(\\vec{e}_n\\)'], {
+            color: 'red', offset: [8, -8], useMathJax: true
+        });
+
+        // Textanzeige-Struktur
+        const rhoLabel = board.create('text', [1, -1, '\\(\\rho = \\)'], { fontSize: 14, useMathJax: true, fixed: true });
+        const rhoValue = board.create('text', [1.8, -1, ''], { fontSize: 14, useMathJax: false, fixed: true });
+        const infinityText = board.create('text', [1, -1, 'Kr&uuml;mmung \\(\\approx 0, \\; \\rho \\to \\infty\\)'], {
+            fontSize: 14,
+            useMathJax: true,
+            fixed: true,
+            visible: false
+        });
+
+        // 5. Update-Funktion
+        function update() {
+            board.suspendUpdate();
+            const t = slider.Value();
+            const x_d = 1, y_d = df(t);
+            const x_dd = 0, y_dd = ddf(t);
+            const denominator = Math.abs(x_d * y_dd - y_d * x_dd);
+            const isNowInfinity = denominator < 1e-6;
+
+            rhoLabel.setAttribute({ visible: !isNowInfinity });
+            rhoValue.setAttribute({ visible: !isNowInfinity });
+            infinityText.setAttribute({ visible: isNowInfinity });
+
+            K.setAttribute({ visible: !isNowInfinity });
+            osculatingCircle.setAttribute({ visible: !isNowInfinity });
+            radiusLine.setAttribute({ visible: !isNowInfinity });
+
+            en_vec.setAttribute({ visible: !isNowInfinity });
+            en_label.setAttribute({ visible: !isNowInfinity });
+
+            if (!isNowInfinity) {
+                const numerator = Math.pow(x_d * x_d + y_d * y_d, 1.5);
+                const rho = numerator / denominator;
+                rhoValue.setText(rho.toFixed(2));
+                const mag_d = Math.sqrt(x_d * x_d + y_d * y_d);
+                const curvature_sign = Math.sign(x_d * y_dd - y_d * x_dd);
+                const nx = -y_d / mag_d * curvature_sign;
+                const ny = x_d / mag_d * curvature_sign;
+                const Kx = p.X() + rho * nx;
+                const Ky = p.Y() + rho * ny;
+                K.moveTo([Kx, Ky], 0);
+            }
+            board.unsuspendUpdate();
+        }
+
+        // 6. Event-Bindings
+        slider.on('drag', update);
+
+        function initialize() {
+            update();
+            if (window.MathJax && typeof MathJax.typesetPromise === 'function') {
+                MathJax.typesetPromise();
+            }
+        }
+        setTimeout(initialize, 100);
+
+        // =====================================================================
+        // === ENDE ONYX-CODE ================================================
+        // =====================================================================
+    </script>
+</body>
+
+</html>

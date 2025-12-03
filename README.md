@@ -1,2 +1,1 @@
-# TM_JSX_Graph
-TM Beispiele mit JSX-Graph
+# interaktive Beispiele für die Technische Mechanik mit Hilfe von JSX Graph in OPAL/ONYX mit Hilfe von MecLib

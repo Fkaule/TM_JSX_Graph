@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="de">
+
+<head>
+    <meta charset="UTF-8" />
+    <title>MecLib / JSXGraph Aufgabe</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <!-- JSXGraph CSS -->
+    <link rel="stylesheet" href="https://jsxgraph.org/distrib/jsxgraph.css" />
+
+    <!-- JSXGraph JS -->
+    <script src="https://jsxgraph.org/distrib/jsxgraphcore.js"></script>
+
+    <!-- Deine MecLib-/ONYX-Erweiterung aus GitHub -->
+    <script src="https://cdn.jsdelivr.net/gh/Fkaule/TM_JSX_Graph@main/MecLibONYX.js"></script>
+
+    <style>
+        body {
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            margin: 1rem;
+        }
+
+        h1 {
+            font-size: 1.4rem;
+            margin-bottom: 0.5rem;
+        }
+
+        #JSX_CONTAINER_ID {
+            width: 700px;
+            height: 260px;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Interaktive MecLib-Aufgabe</h1>
+
+    <!-- Container für das Board -->
+    <div id="JSX_CONTAINER_ID" class="jxgbox"></div>
+
+    <script>
+        // =====================================================================
+        // === ONYX-CODE HIER EINFÜGEN =========================================
+        // =====================================================================
+
+        document.getElementById('JSX_CONTAINER_ID').style.border = "none";
+        JXG.Options.grid.majorStep = 0;
+
+        window.L = 5;
+        window.force_length = 2;   // dient hier als |F|max f&uuml;r die Skalierung
+        window.force_offset = 0;
+
+        const brd1 = initMecLib('JSX_CONTAINER_ID');
+
+        // Das statische "dim"-Element wird hier entfernt.
+        const content = [
+            ["grid", "", "", -2, window.L + 4, -4, 5, 40],
+            ["force", "F", [window.L / 2, force_length], [window.L / 2, 0], -1],
+            ["force", "F_A", [0, -force_length - force_offset], [0, -force_offset], -1],
+            ["beam", "", [0, 0], [window.L, 0], 0.1],
+            ["fix123", "A", [0, 0], 0],
+        ];
+
+        const continueCode = () => {
+            const L = window.L;
+            const Fmax = window.force_length;   // f&uuml;r Skala
+            const force_offset = window.force_offset;
+            const labelColor = '#0000ff';
+
+            // --- Slider ---
+            const position_slider = board.create('slider',
+                [[-0.5, 3], [L + 0.5, 3], [0, L / 2, L]],
+                { name: 'L in m:', fixed: false, snapWidth: 1 / 3, label: { visible: true } }
+            );
+            const value_slider = board.create('slider',
+                [[-0.5, 4], [L + 0.5, 4], [-Fmax, Fmax / 2, Fmax]],
+                { name: 'F in N', fixed: false, snapWidth: 1 / 3, label: { visible: true } }
+            );
+
+            // --- Referenzen auf meclib-Objekte ---
+            const forceObj = objects[1];
+            const rforceAObj = objects[2];
+            forceObj.p1.setAttribute({ fixed: false });
+            forceObj.p2.setAttribute({ fixed: false });
+            rforceAObj.p1.setAttribute({ fixed: false });
+            rforceAObj.p2.setAttribute({ fixed: false });
+
+            // --- Dynamische Bema&szlig;ung ---
+            const dimYOffset = -1, helpLineLength = 0.2;
+            const dimEndPoint = board.create('point', [position_slider.Value(), 0], { visible: false });
+            board.create('segment', [dimEndPoint, [() => dimEndPoint.X(), dimYOffset - helpLineLength]], { strokeColor: 'black', strokeWidth: 1 });
+            board.create('segment', [[0, 0], [0, dimYOffset - helpLineLength]], { strokeColor: 'black', strokeWidth: 1 });
+            board.create('arrow', [[0, dimYOffset], [() => dimEndPoint.X(), dimYOffset]], { strokeColor: 'black', strokeWidth: 1, firstArrow: true, lastArrow: true });
+            const dimLabel = board.create('text', [() => dimEndPoint.X() / 2, dimYOffset + 0.2, ''], { anchorX: 'middle', useMathJax: false });
+
+            // --- Anzeigen (Texte) ---
+            const momentArrowLabel = board.create('text', [-0.7, 0, toTEX('M_A')], { anchorX: 'right', fixed: true, color: labelColor });
+            const yPosForce = -1.5, yPosMoment = -2.2, xPos = 0.2;
+            board.create('text', [xPos, yPosForce, toTEX('F_A =')], { anchorX: 'left', fixed: true, color: labelColor });
+            const wertAnzeigeFA = board.create('text', [xPos + 1.1, yPosForce, ''], { anchorX: 'left', fixed: true, useMathJax: false, color: labelColor });
+            board.create('text', [xPos, yPosMoment, toTEX('M_A =')], { anchorX: 'left', fixed: true, color: labelColor });
+            const wertAnzeigeMA = board.create('text', [xPos + 1.1, yPosMoment, ''], { anchorX: 'left', fixed: true, useMathJax: false, color: labelColor });
+
+            // --- Momentenbogen (stabil & dynamisch) ---
+            const R = () => 0.6;                        // Radius des Bogens
+            const thetaMax = (120 * Math.PI) / 180;     // Maximalwinkel f&uuml;r |M| = Fmax * L
+            const t0 = Math.PI;                         // Start links (-R, 0)
+            let t1Var = t0;                             // dynamisches Ende
+
+            const arc = board.create('curve',
+                [
+                    (t) => R() * Math.cos(t),
+                    (t) => R() * Math.sin(t),
+                    () => Math.min(t0, t1Var),
+                    () => Math.max(t0, t1Var)
+                ],
+                { strokeWidth: 2, strokeColor: labelColor }
+            );
+
+            const E = board.create('point', [() => R() * Math.cos(t1Var), () => R() * Math.sin(t1Var)], { visible: false });
+            const arr = board.create('arrow', [
+                E,
+                () => {
+                    const d = 0.3;                       // Pfeill&auml;nge
+                    const sgn = (t1Var >= t0) ? +1 : -1; // Richtung entlang des Bogens
+                    const tx = sgn * (-Math.sin(t1Var));
+                    const ty = sgn * (Math.cos(t1Var));
+                    return [E.X() + d * tx, E.Y() + d * ty];
+                }
+            ], { strokeWidth: 2, strokeColor: labelColor, lastArrow: { size: 5, type: 2 } });
+
+            // --- ZENTRALE UPDATE-FUNKTION ---
+            function updateAll(pos, value) {
+                // 1) Kraft F
+                forceObj.p1.moveTo([pos, value], 0);
+                forceObj.p2.moveTo([pos, 0], 0);
+
+                // 2) Bema&szlig;ung
+                dimEndPoint.moveTo([pos, 0], 0);
+                dimLabel.setText('L = ' + pos.toFixed(2) + ' m');
+
+                // 3) Reaktionskraft F_A &ndash; dreht mit Vorzeichen von F, Spitze immer am Balken
+                const isZero = (pos === 0 || value === 0);
+
+                // s = +1  &rarr; Pfeil kommt von oben (F < 0 &rArr; Reaktion nach unten)
+                // s = -1  &rarr; Pfeil kommt von unten (F > 0 &rArr; Reaktion nach oben)
+                const s = -Math.sign(value) || 0;
+
+                // kleine Distanz der Spitze zum Balken (0 = direkt am Balken)
+                const tipY = s * (force_offset);          // Spitze am Balken (mit kleinem Vorzeichen-Offset)
+                const len = Math.abs(value);             // visuelle L&auml;nge proportional zum Betrag
+
+                // Pfeil von p1 &rarr; p2 (p2 ist Spitze am Balken)
+                rforceAObj.p2.moveTo([0, tipY], 0);        // Spitze (am Balken)
+                rforceAObj.p1.moveTo([0, tipY + s * len], 0);// Schaft weiter weg, gleiche Seite
+
+                rforceAObj.p1.setAttribute({ visible: !isZero });
+                rforceAObj.p2.setAttribute({ visible: !isZero });
+
+
+
+                // 4) Moment: Betrag + (nur) Richtung invertiert
+                const F = value;
+                const a = pos;
+                const M = Math.abs(F * a);   // immer positiv anzeigen
+
+                // Textwerte
+                wertAnzeigeFA.setText(F.toFixed(1) + ' N');
+                wertAnzeigeMA.setText(M.toFixed(1) + ' Nm');
+
+                // Sichtbarkeit
+                const showM = !isZero;
+                momentArrowLabel.setAttribute({ visible: showM });
+                arc.setAttribute({ visible: showM });
+                arr.setAttribute({ visible: showM });
+                if (!showM) { board.update(); return; }
+
+                // Winkelgr&ouml;&szlig;e: linear mit |M|, begrenzt auf thetaMax
+                const Mmax = Math.max(1e-9, Fmax * L);
+                const thetaMag = thetaMax * Math.min(1, M / Mmax);   // 0..thetaMax
+
+                // *** Richtungsumkehr gegen&uuml;ber dem funktionierenden Stand ***
+                // Vorher: const dir = (F >= 0) ? -1 : +1;
+                // Jetzt invertiert:
+                const dir = (F >= 0) ? +1 : -1;
+
+                // Zielwinkel
+                t1Var = t0 + dir * thetaMag;
+
+                // zur&uuml;ck zu Standardfarben
+                wertAnzeigeFA.setAttribute({ color: labelColor });
+                wertAnzeigeMA.setAttribute({ color: labelColor });
+
+                board.update();
+            }
+
+            // Slider -> Update
+            const onDrag = () => updateAll(position_slider.Value(), value_slider.Value());
+            position_slider.on('drag', onDrag); position_slider.on('up', onDrag);
+            value_slider.on('drag', onDrag); value_slider.on('up', onDrag);
+
+            // Initial
+            updateAll(position_slider.Value(), value_slider.Value());
+        };
+
+        runMecLib(brd1, content, continueCode);
+
+        // =====================================================================
+        // === ENDE ONYX-CODE ================================================
+        // =====================================================================
+    </script>
+</body>
+
+</html>
