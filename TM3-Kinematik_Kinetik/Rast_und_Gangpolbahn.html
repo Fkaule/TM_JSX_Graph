@@ -47,7 +47,7 @@
         (() => {
             const CID = 'JSX_CONTAINER_ID';
 
-            // vorhandenes Board freigeben (ONYX/JSXGraph Mehrfach-Init absichern)
+            // Mehrfach-Init absichern
             try {
                 if (window.JXG && JXG.JSXGraph && JXG.JSXGraph.boards) {
                     for (const k in JXG.JSXGraph.boards) {
@@ -60,31 +60,36 @@
             const host = document.getElementById(CID);
             if (!host) return;
             host.style.border = "none";
-            host.style.width = "800px";
-            host.style.height = "440px";
 
             // ---------------- Grundparameter ----------------
             const R = 1.2;                                     // Kreisradius
             const bbox = { left: -2, top: 5.2, right: 11, bottom: -1.6 };
+
+            // Container so skalieren, dass Kreise rund bleiben (1:1)
+            const Wpx = 800;                                   // Breite nach Wunsch
+            const aspect = (bbox.top - bbox.bottom) / (bbox.right - bbox.left);
+            host.style.width = Wpx + "px";
+            host.style.height = (Wpx * aspect) + "px";
 
             // Sichtbarer Rand, damit die Scheibe links/rechts komplett im Bild bleibt
             const pad = 0.2;
             const Xleft = bbox.left + R + pad;               // linke Zentrumslage (voll sichtbar)
             const Xright = bbox.right - R - pad;               // rechte Zentrumslage (voll sichtbar)
 
-            // xC = X0 + R*&theta; ; wir starten "ganz links" mit &theta; = &theta;_min = 0
+            // xC = X0 + R*θ ; wir starten "ganz links" mit θ = θ_min = 0
             const X0 = Xleft;
             const thMin = 0;
             const thMax = Math.max(0, (Xright - Xleft) / R);
 
-            // *** EINSTELLUNG: Gleichm&auml;&szlig;iger Abstand der Punkte auf beiden Bahnen ***
-            const DELTA_S = 0.40;                              // <-- HIER den Punktabstand einstellen (in "x"-L&auml;nge)
-            const DTH = DELTA_S / R;                           // zugeh&ouml;riger Winkelabstand
+            // Gleichmäßiger Abstand der Punkte entlang der Ebene
+            const DELTA_S = 0.40;                              // <-- Abstand der Samples auf der Ebene (x-Länge)
+            const DTH = DELTA_S / R;                           // zugehöriger Winkelabstand
 
-            // Board (Standard-KS: x nach rechts, y nach oben)
+            // Board (1:1)
             const brd = JXG.JSXGraph.initBoard(CID, {
                 boundingbox: [bbox.left, bbox.top, bbox.right, bbox.bottom],
-                axis: false, keepaspectratio: false, showNavigation: false, showCopyright: false
+                keepaspectratio: true,
+                axis: false, showNavigation: false, showCopyright: false
             });
 
             // Farben/Styles
@@ -99,119 +104,167 @@
 
             // Hilfsfunktionen: Rollbedingung (Zentrum) & Orientierung
             const xC = (th) => X0 + R * th;
-            const psi = () => -thSlider.Value();   // CCW-&theta; => CW-Orientierung &psi;=-&theta; f&uuml;r Rollen nach rechts
+            const psi = () => -thSlider.Value();   // ψ = -θ (Rollen nach rechts)
 
-            // Bodenlinie + F&uuml;llung darunter
-            brd.create('line', [[bbox.left, 0], [bbox.right, 0]],
-                { straightFirst: false, straightLast: false, strokeColor: col.ground, strokeWidth: 2 });
+            // Bodenlinie + Füllung darunter
+            brd.create('line', [[bbox.left, 0], [bbox.right, 0]], {
+                straightFirst: false, straightLast: false, strokeColor: col.ground, strokeWidth: 2, layer: 1
+            });
             brd.create('polygon',
                 [[bbox.left, 0], [bbox.right, 0], [bbox.right, bbox.bottom], [bbox.left, bbox.bottom]],
                 { fillColor: col.groundFill, fillOpacity: 0.7, borders: { visible: false }, fixed: true, layer: 0 }
             );
 
-            // Slider &theta; (Start ganz links)
+            // Slider θ (Start ganz links)
             const thSlider = brd.create('slider',
                 [[bbox.left + 0.6, bbox.top - 0.8], [bbox.right - 0.6, bbox.top - 0.8], [thMin, thMin, thMax]],
-                { withLabel: true, name: '&theta;', snapWidth: (Math.PI / 90) }
+                { withLabel: true, name: 'θ', snapWidth: (Math.PI / 90) }
             );
 
             // Scheibe/Kugel (2D-Schnitt)
-            const C = brd.create('point', [() => xC(thSlider.Value()), () => R], { visible: false, fixed: true });
-            const Ptop = brd.create('point', [() => C.X(), () => C.Y() + R], { visible: false, fixed: true });
-            brd.create('circle', [C, Ptop], { strokeColor: col.diskEdge, fillColor: col.diskFill, fillOpacity: 0.15, strokeWidth: 2 });
+            const C = brd.create('point', [() => xC(thSlider.Value()), () => R],
+                { visible: false, fixed: true, layer: 5 });
+            const Ptop = brd.create('point', [() => C.X(), () => C.Y() + R],
+                { visible: false, fixed: true, layer: 5 });
+            brd.create('circle', [C, Ptop], {
+                strokeColor: col.diskEdge, fillColor: col.diskFill, fillOpacity: 0.15, strokeWidth: 2, layer: 5
+            });
 
-            // mitdrehendes KS am Mittelpunkt (&psi;=-&theta;)
+            // mitdrehendes KS am Mittelpunkt (ψ=-θ)
             const axLen = 0.9;
             brd.create('arrow',
                 [C, () => [C.X() + axLen * Math.cos(psi()), C.Y() + axLen * Math.sin(psi())]],
-                { strokeColor: col.axes, strokeWidth: 2 });
+                { strokeColor: col.axes, strokeWidth: 2, layer: 6 });
             brd.create('arrow',
                 [C, () => [C.X() - axLen * Math.sin(psi()), C.Y() + axLen * Math.cos(psi())]],
-                { strokeColor: col.axes, strokeWidth: 2, dash: 2 });
+                { strokeColor: col.axes, strokeWidth: 2, dash: 2, layer: 6 });
             brd.create('text', [() => C.X() + axLen * Math.cos(psi()) + 0.2,
             () => C.Y() + axLen * Math.sin(psi()),
                 "<span style='font-family:serif;font-style:italic'>x'</span>"],
-                { display: 'html', fixed: true });
+                { display: 'html', fixed: true, layer: 7 });
             brd.create('text', [() => C.X() - axLen * Math.sin(psi()) + 0.2,
             () => C.Y() + axLen * Math.cos(psi()),
                 "<span style='font-family:serif;font-style:italic'>y'</span>"],
-                { display: 'html', fixed: true });
+                { display: 'html', fixed: true, layer: 7 });
 
             // Aktueller Kontaktpunkt (Rast) auf der Ebene
             brd.create('point',
                 [() => xC(thSlider.Value()), 0],
-                { name: '', face: 'o', size: 4, strokeColor: '#000', fillColor: '#000', fixed: true, highlight: false });
+                { name: '', face: 'o', size: 4, strokeColor: '#000', fillColor: '#000', fixed: true, highlight: false, layer: 8 });
 
-            // &Uuml;berschriften
+            // Titel
             brd.create('text', [bbox.left + 0.2, bbox.top - 1.5,
                 "<b>Rastpolbahn</b> (festes System)"],
-                { display: 'html', fixed: true, strokeColor: col.rast });
+                { display: 'html', fixed: true, strokeColor: col.rast, layer: 12 });
             brd.create('text', [bbox.left + 0.2, bbox.top - 1.8,
                 "<b>Gangpolbahn</b> (bewegtes System)"],
-                { display: 'html', fixed: true, strokeColor: col.gang });
+                { display: 'html', fixed: true, strokeColor: col.gang, layer: 12 });
 
-            // ---------------- Gleichm&auml;&szlig;iges Sampling ----------------
+            // ---------------- Gleichmäßiges Sampling ----------------
             const rastPoints = [];
             const gangPoints = [];
-            const madeIndex = new Set();               // welche Indizes k wurden schon erzeugt?
-            const xRef = xC(thMin);                    // Referenz f&uuml;r Index 0 (ganz links)
+            const thetaSamples = [];                      // nur Zahlen! stabil für die Polylinien
+            const madeIndex = new Set();                  // welche Indizes k wurden schon erzeugt?
+            const xRef = xC(thMin);                       // Referenz für Index 0 (ganz links)
 
-            // Erzeuge Sample f&uuml;r Index k (einheitlicher Abstand)
+            // Polylinien (werden mit Zahlenarrays befüllt -> keine Funktions-Lags)
+            const rastCurve = brd.create('curve', [[], []],
+                { strokeColor: col.rast, strokeWidth: 2.2, layer: 11, highlight: false });
+            const gangCurve = brd.create('curve', [[], []],
+                { strokeColor: col.gang, strokeWidth: 2.2, layer: 11, highlight: false });
+
+            function refreshCurvesNumeric() {
+                const thNow = thSlider.Value();
+                const XcNow = xC(thNow);
+                const psiNow = -thNow;
+
+                // Rast: direkt auf der Ebene
+                const rx = thetaSamples.map(thk => xC(thk));
+                const ry = thetaSamples.map(_ => 0);
+
+                // Gang: C bewegt sich, Punkte rotieren mit ψ + θ_k - π/2
+                const gx = thetaSamples.map(thk => XcNow + R * Math.cos(psiNow + thk - Math.PI / 2));
+                const gy = thetaSamples.map(thk => R + R * Math.sin(psiNow + thk - Math.PI / 2));
+
+                rastCurve.dataX = rx; rastCurve.dataY = ry;
+                gangCurve.dataX = gx; gangCurve.dataY = gy;
+            }
+
+            // Erzeuge Sample für Index k (einheitlicher Abstand)
             function createSampleAtIndex(k) {
                 if (madeIndex.has(k)) return;
-                const theta_k = thMin + k * DTH;         // zugeh&ouml;riger Winkel
+
+                const theta_k = thMin + k * DTH;           // zugehöriger Winkel
                 const px = xC(theta_k);
 
-                // Rastpolpunkt (fest)
+                brd.suspendUpdate();
+
+                // Rast-Punkt (fest, zur Ansicht)
                 const pR = brd.create('point', [px, 0], {
-                    name: '', size: 2, face: 'o', strokeColor: col.rast, fillColor: col.rast, fixed: true, highlight: false
+                    name: '', size: 2, face: 'o', strokeColor: col.rast,
+                    fillColor: col.rast, fixed: true, highlight: false, layer: 10
                 });
                 rastPoints.push(pR);
 
-                // Gangpolpunkt (bewegtes KS):
-                // Weltwinkel jetzt: alpha = psi() + theta_k - &pi;/2
+                // Gang-Punkt (mitlaufend, zur Ansicht) – Position per Funktionen
                 const pG = brd.create('point',
                     [
-                        () => C.X() + R * Math.cos(psi() + theta_k - Math.PI / 2),
-                        () => C.Y() + R * Math.sin(psi() + theta_k - Math.PI / 2)
+                        () => xC(thSlider.Value()) + R * Math.cos(-thSlider.Value() + theta_k - Math.PI / 2),
+                        () => R + R * Math.sin(-thSlider.Value() + theta_k - Math.PI / 2)
                     ],
-                    { name: '', size: 2, face: 'o', strokeColor: col.gang, fillColor: col.gang, fixed: true, highlight: false }
+                    {
+                        name: '', size: 2, face: 'o', strokeColor: col.gang,
+                        fillColor: col.gang, fixed: true, highlight: false, layer: 10
+                    }
                 );
                 gangPoints.push(pG);
 
+                thetaSamples.push(theta_k);
                 madeIndex.add(k);
+
+                // Polylinien als reine Zahlenarrays aktualisieren
+                refreshCurvesNumeric();
+
+                brd.unsuspendUpdate();
             }
 
-            // F&uuml;lle alle noch fehlenden Samples bis zum aktuellen Sliderstand
+            // Fülle alle noch fehlenden Samples bis zum aktuellen Sliderstand
             function ensureSamplesUpToTheta(thetaNow) {
-                // Index basierend auf konstantem Bodenabstand &Delta;s
                 const xNow = xC(thetaNow);
                 let kNow = Math.floor((xNow - xRef) / DELTA_S + 1e-9);  // 0,1,2,...
                 if (kNow < 0) kNow = 0;
 
-                // fehlende Indizes anlegen
-                for (let k = 0; k <= kNow; k++) {
-                    createSampleAtIndex(k);
-                }
+                brd.suspendUpdate();
+                for (let k = 0; k <= kNow; k++) createSampleAtIndex(k);
+                // auch ohne neue Punkte die Polylinien numerisch nachführen
+                refreshCurvesNumeric();
+                brd.unsuspendUpdate();
             }
 
-            // Slider-Handler (unabh&auml;ngig von Ziehgeschwindigkeit)
-            function onSlide() {
-                ensureSamplesUpToTheta(thSlider.Value());
-            }
+            // Slider-Handler
+            function onSlide() { ensureSamplesUpToTheta(thSlider.Value()); }
 
             // Reset-Button
             brd.create('button', [bbox.left + 0.2, bbox.bottom + 0.4, 'Reset Bahnen', () => {
+                brd.suspendUpdate();
+
                 // Punkte entfernen
                 rastPoints.splice(0).forEach(p => brd.removeObject(p));
                 gangPoints.splice(0).forEach(p => brd.removeObject(p));
+                thetaSamples.splice(0, thetaSamples.length);
                 madeIndex.clear();
+
+                // Kurven leeren
+                rastCurve.dataX = []; rastCurve.dataY = [];
+                gangCurve.dataX = []; gangCurve.dataY = [];
 
                 // Slider ganz links
                 thSlider.setValue(thMin);
 
                 // Startpunkt (Index 0) erzeugen
                 ensureSamplesUpToTheta(thSlider.Value());
+
+                brd.unsuspendUpdate();
                 brd.update();
             }]);
 
@@ -219,10 +272,11 @@
             thSlider.setValue(thMin);
             ensureSamplesUpToTheta(thSlider.Value());
 
-            // Beim Ziehen automatisch fehlende Punkte mit konstantem Abstand erg&auml;nzen
+            // Beim Ziehen automatisch fehlende Punkte mit konstantem Abstand ergänzen
             thSlider.on('drag', onSlide);
             thSlider.on('up', onSlide);
         })();
+
 
         // =====================================================================
         // === ENDE ONYX-CODE ================================================
